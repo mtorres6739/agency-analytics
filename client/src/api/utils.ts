@@ -8,6 +8,14 @@ import { CommonApiParams } from "./analytics/endpoints/types";
 
 export function getStartAndEndDate(time: Time): { startDate: string | null; endDate: string | null } {
   if (time.mode === "range") {
+    if (time.startTime && time.endTime) {
+      const timeZone = getTimezone();
+      const end = DateTime.fromISO(`${time.endDate}T${time.endTime}`, { zone: timeZone });
+      return {
+        startDate: time.startDate,
+        endDate: end.minus({ milliseconds: 1 }).toISODate(),
+      };
+    }
     return { startDate: time.startDate, endDate: time.endDate };
   }
   if (time.mode === "week") {
@@ -59,6 +67,19 @@ export function buildApiParams(time: Time, options: { filters?: Filter[] } = {})
       filters,
       pastMinutesStart: time.pastMinutesStart,
       pastMinutesEnd: time.pastMinutesEnd,
+    };
+  }
+
+  if (time.mode === "range" && time.startTime && time.endTime) {
+    const start = DateTime.fromISO(`${time.startDate}T${time.startTime}`, { zone: timeZone });
+    const end = DateTime.fromISO(`${time.endDate}T${time.endTime}`, { zone: timeZone });
+    return {
+      startDate: "",
+      endDate: "",
+      timeZone,
+      filters,
+      startDateTime: start.toUTC().toFormat("yyyy-MM-dd HH:mm:ss"),
+      endDateTime: end.toUTC().toFormat("yyyy-MM-dd HH:mm:ss"),
     };
   }
 

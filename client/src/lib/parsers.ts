@@ -75,8 +75,8 @@ export const parseAsWellKnown = parseAsStringEnum(wellKnownValues);
 export const parseAsIsoDate = parseAsString;
 
 // JSON parsers for complex types
-export const parseAsFilters = parseAsJson<Filter[]>((value) => value as Filter[]);
-export const parseAsStringArray = parseAsJson<string[]>((value) => value as string[]);
+export const parseAsFilters = parseAsJson<Filter[]>(value => value as Filter[]);
+export const parseAsStringArray = parseAsJson<string[]>(value => value as string[]);
 
 // GSC status parser (for OAuth callback)
 export const parseAsGscStatus = parseAsString;
@@ -102,6 +102,10 @@ export const analyticsParsers = {
   day: parseAsIsoDate,
   startDate: parseAsIsoDate,
   endDate: parseAsIsoDate,
+  startTime: parseAsOptionalString,
+  endTime: parseAsOptionalString,
+  startDateTime: parseAsOptionalString,
+  endDateTime: parseAsOptionalString,
   week: parseAsIsoDate,
   month: parseAsIsoDate,
   year: parseAsIsoDate,

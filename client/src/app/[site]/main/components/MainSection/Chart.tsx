@@ -53,6 +53,49 @@ const stepBucket = (
   }
 };
 
+const floorToBucket = (dt: DateTime, bucket: TimeBucket): DateTime => {
+  switch (bucket) {
+    case "minute":
+      return dt.startOf("minute");
+    case "five_minutes":
+      return dt.set({
+        minute: Math.floor(dt.minute / 5) * 5,
+        second: 0,
+        millisecond: 0,
+      });
+    case "ten_minutes":
+      return dt.set({
+        minute: Math.floor(dt.minute / 10) * 10,
+        second: 0,
+        millisecond: 0,
+      });
+    case "fifteen_minutes":
+      return dt.set({
+        minute: Math.floor(dt.minute / 15) * 15,
+        second: 0,
+        millisecond: 0,
+      });
+    case "hour":
+      return dt.startOf("hour");
+    case "day":
+      return dt.startOf("day");
+    case "week":
+      return dt.startOf("week");
+    case "month":
+      return dt.startOf("month");
+    case "year":
+      return dt.startOf("year");
+  }
+};
+
+const canDragSelectBucket = (bucket: TimeBucket) =>
+  bucket === "minute" ||
+  bucket === "five_minutes" ||
+  bucket === "ten_minutes" ||
+  bucket === "fifteen_minutes" ||
+  bucket === "hour" ||
+  bucket === "day";
+
 type Point = {
   x: Date;
   y: number;
@@ -78,7 +121,9 @@ const formatTooltipValue = (value: number, selectedStat: StatType): string => {
 const formatXTick = (
   date: Date,
   mode: Time["mode"],
-  pastMinutesStart: number | undefined
+  bucket: TimeBucket,
+  pastMinutesStart: number | undefined,
+  isExactRange: boolean
 ) => {
   const dt = DateTime.fromJSDate(date, { zone: "utc" })
     .setZone(getTimezone())
@@ -89,7 +134,15 @@ const formatXTick = (
     }
     return dt.toFormat(hour12 ? "ha" : "HH:mm");
   }
-  if (mode === "day") {
+  if (
+    mode === "day" ||
+    (isExactRange &&
+      (bucket === "minute" ||
+        bucket === "five_minutes" ||
+        bucket === "ten_minutes" ||
+        bucket === "fifteen_minutes" ||
+        bucket === "hour"))
+  ) {
     return dt.toFormat(hour12 ? "ha" : "HH:mm");
   }
   return dt.toFormat(hour12 ? "MMM d" : "dd MMM");
@@ -110,6 +163,7 @@ export function Chart({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const timezone = getTimezone();
+  const isExactRange = time.mode === "range" && Boolean(time.startTime && time.endTime);
   const clipId = useId().replace(/:/g, "");
 
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -193,6 +247,7 @@ export function Chart({
     const currentMonthStr = DateTime.now().toFormat("yyyy-MM-01");
     const shouldNotDisplay =
       time.mode === "all-time" ||
+      isExactRange ||
       time.mode === "year" ||
       (time.mode === "month" && time.month !== currentMonthStr) ||
       (time.mode === "day" && time.day !== currentDayStr) ||
@@ -219,6 +274,7 @@ export function Chart({
     bucket,
     timezone,
     chartXMax,
+    isExactRange,
   ]);
 
   const W = size.width;
@@ -389,10 +445,9 @@ export function Chart({
 
   const handleMouseLeave = () => setHover(null);
 
-  // Drag-to-select range. Day bucket only for now; other buckets would need
-  // to also pick the bucket on commit (e.g. switching to week if the selection
-  // is > 31 days) and that's out of scope here.
-  const dragEnabled = bucket === "day";
+  // Drag-to-select range. Day buckets keep using date ranges; sub-day buckets
+  // commit an exact half-open datetime range [start, end).
+  const dragEnabled = canDragSelectBucket(bucket);
   const [dragRaw, setDragRaw] = useState<{
     startX: number;
     currentX: number;
@@ -400,41 +455,36 @@ export function Chart({
   } | null>(null);
 
   // Snap drag positions the same way hover does: to the nearest visible
-  // current bucket. Flooring the raw timestamp makes clicks just left of a
-  // daily bucket commit the previous day, even while the crosshair shows the
-  // intended bucket.
-  const pxToDay = useCallback(
+  // current bucket, so the committed selection matches the crosshair.
+  const pxToBucketStart = useCallback(
     (px: number) => {
       const xDate = xScale.invert(px);
       const point = current[bisectCurrent(current, xDate)];
       if (point) {
-        return DateTime.fromJSDate(point.x, { zone: "utc" })
-          .setZone(timezone)
-          .startOf("day");
+        return DateTime.fromJSDate(point.x, { zone: "utc" }).setZone(timezone);
       }
-      return DateTime.fromMillis(xDate.getTime() + 1000, { zone: "utc" })
-        .setZone(timezone)
-        .startOf("day");
+      return floorToBucket(
+        DateTime.fromMillis(xDate.getTime(), { zone: "utc" }).setZone(timezone),
+        bucket
+      );
     },
-    [bisectCurrent, current, timezone, xScale]
+    [bisectCurrent, bucket, current, timezone, xScale]
   );
 
   const dragSnapped = useMemo(() => {
     if (!dragRaw) return null;
     const leftPx = Math.min(dragRaw.startX, dragRaw.currentX);
     const rightPx = Math.max(dragRaw.startX, dragRaw.currentX);
-    const leftDay = pxToDay(leftPx);
-    const rightDay = pxToDay(rightPx);
+    const leftBucket = pxToBucketStart(leftPx);
+    const rightBucket = pxToBucketStart(rightPx);
     return {
-      leftPx: xScale(leftDay.toUTC().toJSDate()),
-      rightPx: xScale(rightDay.toUTC().toJSDate()),
-      startDate: leftDay.toISODate(),
-      endDate: rightDay.toISODate(),
+      leftPx: xScale(leftBucket.toUTC().toJSDate()),
+      rightPx: xScale(rightBucket.toUTC().toJSDate()),
     };
-  }, [dragRaw, pxToDay, xScale]);
+  }, [dragRaw, pxToBucketStart, xScale]);
 
   const handleMouseDown = (e: React.MouseEvent<SVGRectElement>) => {
-    if (!dragEnabled) return;
+    if (!dragEnabled || !current.length) return;
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const startX = Math.max(
@@ -467,12 +517,33 @@ export function Chart({
       if (!moved) return;
       const leftPx = Math.min(startX, currentX);
       const rightPx = Math.max(startX, currentX);
-      const startDate = pxToDay(leftPx).toISODate();
-      const endDate = pxToDay(rightPx).toISODate();
-      if (startDate && endDate) {
+      const startBucket = pxToBucketStart(leftPx);
+      const endBucket = pxToBucketStart(rightPx);
+
+      if (bucket === "day") {
+        const startDate = startBucket.toISODate();
+        const endDate = endBucket.toISODate();
+        if (!startDate || !endDate) return;
         // Pass changeBucket=false so dragging within e.g. an all-time/day
         // view doesn't auto-switch to week/month for shorter ranges.
         setTime({ mode: "range", startDate, endDate }, false);
+        return;
+      }
+
+      const endExclusive = stepBucket(endBucket, bucket, 1);
+      const startDate = startBucket.toISODate();
+      const endDate = endExclusive.toISODate();
+      if (startDate && endDate) {
+        setTime(
+          {
+            mode: "range",
+            startDate,
+            endDate,
+            startTime: startBucket.toFormat("HH:mm:ss"),
+            endTime: endExclusive.toFormat("HH:mm:ss"),
+          },
+          false
+        );
       }
     };
 
@@ -632,7 +703,11 @@ export function Chart({
                 {formatXTick(
                   t,
                   time.mode,
-                  time.mode === "past-minutes" ? time.pastMinutesStart : undefined
+                  bucket,
+                  time.mode === "past-minutes"
+                    ? time.pastMinutesStart
+                    : undefined,
+                  isExactRange
                 )}
               </text>
             </g>
@@ -687,7 +762,7 @@ export function Chart({
             />
           )}
 
-          {/* Drag-to-select range overlay — snapped to whole-day boundaries. */}
+          {/* Drag-to-select range overlay - snapped to bucket boundaries. */}
           {dragSnapped && dragRaw?.moved && (
             <g pointerEvents="none">
               <rect

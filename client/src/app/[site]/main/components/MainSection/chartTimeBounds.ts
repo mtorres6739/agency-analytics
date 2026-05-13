@@ -17,6 +17,30 @@ const bucketEndOffsetMinutes = (bucket: TimeBucket): number => {
   }
 };
 
+const stepBucket = (dt: DateTime, bucket: TimeBucket, direction: 1 | -1): DateTime => {
+  const n = direction;
+  switch (bucket) {
+    case "minute":
+      return dt.plus({ minutes: n });
+    case "five_minutes":
+      return dt.plus({ minutes: 5 * n });
+    case "ten_minutes":
+      return dt.plus({ minutes: 10 * n });
+    case "fifteen_minutes":
+      return dt.plus({ minutes: 15 * n });
+    case "hour":
+      return dt.plus({ hours: n });
+    case "day":
+      return dt.plus({ days: n });
+    case "week":
+      return dt.plus({ weeks: n });
+    case "month":
+      return dt.plus({ months: n });
+    case "year":
+      return dt.plus({ years: n });
+  }
+};
+
 export type ChartTimeBounds = { min: Date | undefined; max: Date | undefined };
 
 // Returns full-period x-scale bounds so the current and previous charts share
@@ -79,6 +103,16 @@ export const getChartTimeBounds = (
   }
 
   if (time.mode === "range") {
+    if (time.startTime && time.endTime) {
+      const start = DateTime.fromISO(`${time.startDate}T${time.startTime}`, { zone: timezone });
+      const endExclusive = DateTime.fromISO(`${time.endDate}T${time.endTime}`, { zone: timezone });
+      const displayEnd = stepBucket(endExclusive, bucket, -1);
+      return {
+        min: start.toJSDate(),
+        max: (displayEnd > start ? displayEnd : endExclusive).toJSDate(),
+      };
+    }
+
     return {
       min: DateTime.fromISO(time.startDate, { zone: timezone }).startOf("day").toJSDate(),
       max: DateTime.fromISO(time.endDate, { zone: timezone })
