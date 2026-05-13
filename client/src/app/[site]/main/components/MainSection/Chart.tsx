@@ -148,6 +148,45 @@ const formatXTick = (
   return dt.toFormat(hour12 ? "MMM d" : "dd MMM");
 };
 
+const isSameTime = (a: Time, b: Time): boolean => {
+  if (a.mode !== b.mode) return false;
+
+  switch (a.mode) {
+    case "day":
+      return b.mode === "day" && a.day === b.day && a.wellKnown === b.wellKnown;
+    case "range":
+      return (
+        b.mode === "range" &&
+        a.startDate === b.startDate &&
+        a.endDate === b.endDate &&
+        a.startTime === b.startTime &&
+        a.endTime === b.endTime &&
+        a.wellKnown === b.wellKnown
+      );
+    case "week":
+      return (
+        b.mode === "week" && a.week === b.week && a.wellKnown === b.wellKnown
+      );
+    case "month":
+      return (
+        b.mode === "month" && a.month === b.month && a.wellKnown === b.wellKnown
+      );
+    case "year":
+      return (
+        b.mode === "year" && a.year === b.year && a.wellKnown === b.wellKnown
+      );
+    case "all-time":
+      return b.mode === "all-time" && a.wellKnown === b.wellKnown;
+    case "past-minutes":
+      return (
+        b.mode === "past-minutes" &&
+        a.pastMinutesStart === b.pastMinutesStart &&
+        a.pastMinutesEnd === b.pastMinutesEnd &&
+        a.wellKnown === b.wellKnown
+      );
+  }
+};
+
 export function Chart({
   data,
   previousData,
@@ -453,6 +492,19 @@ export function Chart({
     currentX: number;
     moved: boolean;
   } | null>(null);
+  const dragZoomRestoreRef = useRef<{
+    before: Time;
+    after: Time;
+    bucket: TimeBucket;
+  } | null>(null);
+
+  useEffect(() => {
+    const dragZoom = dragZoomRestoreRef.current;
+    if (!dragZoom) return;
+    if (!isSameTime(time, dragZoom.after) || bucket !== dragZoom.bucket) {
+      dragZoomRestoreRef.current = null;
+    }
+  }, [bucket, time]);
 
   // Snap drag positions the same way hover does: to the nearest visible
   // current bucket, so the committed selection matches the crosshair.
@@ -524,9 +576,11 @@ export function Chart({
         const startDate = startBucket.toISODate();
         const endDate = endBucket.toISODate();
         if (!startDate || !endDate) return;
+        const nextTime: Time = { mode: "range", startDate, endDate };
+        dragZoomRestoreRef.current = { before: time, after: nextTime, bucket };
         // Pass changeBucket=false so dragging within e.g. an all-time/day
         // view doesn't auto-switch to week/month for shorter ranges.
-        setTime({ mode: "range", startDate, endDate }, false);
+        setTime(nextTime, false);
         return;
       }
 
@@ -534,21 +588,31 @@ export function Chart({
       const startDate = startBucket.toISODate();
       const endDate = endExclusive.toISODate();
       if (startDate && endDate) {
-        setTime(
-          {
-            mode: "range",
-            startDate,
-            endDate,
-            startTime: startBucket.toFormat("HH:mm:ss"),
-            endTime: endExclusive.toFormat("HH:mm:ss"),
-          },
-          false
-        );
+        const nextTime: Time = {
+          mode: "range",
+          startDate,
+          endDate,
+          startTime: startBucket.toFormat("HH:mm:ss"),
+          endTime: endExclusive.toFormat("HH:mm:ss"),
+        };
+        dragZoomRestoreRef.current = { before: time, after: nextTime, bucket };
+        setTime(nextTime, false);
       }
     };
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent<SVGRectElement>) => {
+    const dragZoom = dragZoomRestoreRef.current;
+    if (!dragZoom) return;
+    if (!isSameTime(time, dragZoom.after) || bucket !== dragZoom.bucket) return;
+
+    e.preventDefault();
+    setHover(null);
+    dragZoomRestoreRef.current = null;
+    setTime(dragZoom.before, false);
   };
 
   const tooltipWidth = 220;
@@ -802,6 +866,7 @@ export function Chart({
               fill="transparent"
               style={{ cursor: dragEnabled ? "crosshair" : "default" }}
               onMouseDown={handleMouseDown}
+              onDoubleClick={handleDoubleClick}
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
             />

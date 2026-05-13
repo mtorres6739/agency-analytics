@@ -1262,5 +1262,15 @@
   "5YSWst": "Script is installed and running correctly.",
   "EIQFLe": "Script tag found but not executing",
   "+x0BAO": "Script not detected",
-  "rOpS8J": "Rybbit v{latest} is available (you're on v{current})"
+  "rOpS8J": "Rybbit v{latest} is available (you're on v{current})",
+  "Z3IDkP": "Outbound Click",
+  "ausAKx": "Clicked button with text \"{text}\"",
+  "gK3VmA": "Clicked button",
+  "KUJ7WS": "Copied text",
+  "LyJrRs": "Copied \"{text}\"",
+  "Rf6GA/": "Submitted form \"{name}\"",
+  "QOaR8l": "Submitted form to \"{action}\"",
+  "IQ5tZg": "Submitted form",
+  "+B+qvw": "Changed {type}input \"{name}\"",
+  "vDpLV2": "Changed {type}input"
 }
