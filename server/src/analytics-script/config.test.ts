@@ -56,6 +56,7 @@ describe("parseScriptConfig", () => {
       trackButtonClicks: false,
       trackCopy: false,
       trackFormInteractions: false,
+      tag: "",
       skipPatterns: [],
       maskPatterns: [],
       sessionReplayBatchInterval: 5000,
@@ -75,13 +76,10 @@ describe("parseScriptConfig", () => {
       sessionReplaySampleRate: undefined,
     });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      "https://analytics.example.com/site/tracking-config/123",
-      {
-        method: "GET",
-        credentials: "omit",
-      }
-    );
+    expect(global.fetch).toHaveBeenCalledWith("https://analytics.example.com/site/tracking-config/123", {
+      method: "GET",
+      credentials: "omit",
+    });
   });
 
   it("should use defaults when API call fails", async () => {
@@ -111,6 +109,7 @@ describe("parseScriptConfig", () => {
       trackButtonClicks: false,
       trackCopy: false,
       trackFormInteractions: false,
+      tag: "",
       skipPatterns: [],
       maskPatterns: [],
       sessionReplayBatchInterval: 5000,
@@ -129,9 +128,7 @@ describe("parseScriptConfig", () => {
       sessionReplaySampleRate: undefined,
     });
 
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      "Failed to fetch tracking config from API, using defaults"
-    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith("Failed to fetch tracking config from API, using defaults");
   });
 
   it("should use defaults when network error occurs", async () => {
@@ -158,6 +155,7 @@ describe("parseScriptConfig", () => {
       trackButtonClicks: false,
       trackCopy: false,
       trackFormInteractions: false,
+      tag: "",
       skipPatterns: [],
       maskPatterns: [],
       sessionReplayBatchInterval: 5000,
@@ -176,10 +174,7 @@ describe("parseScriptConfig", () => {
       sessionReplaySampleRate: undefined,
     });
 
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      "Error fetching tracking config:",
-      expect.any(Error)
-    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith("Error fetching tracking config:", expect.any(Error));
   });
 
   it("should handle missing src attribute", async () => {
@@ -366,7 +361,10 @@ describe("parseScriptConfig", () => {
   it("should parse session replay mask text selectors", async () => {
     mockScriptTag.setAttribute("src", "https://analytics.example.com/script.js");
     mockScriptTag.setAttribute("data-site-id", "123");
-    mockScriptTag.setAttribute("data-replay-mask-text-selectors", '[".user-name", ".email-address", "[data-sensitive]"]');
+    mockScriptTag.setAttribute(
+      "data-replay-mask-text-selectors",
+      '[".user-name", ".email-address", "[data-sensitive]"]'
+    );
 
     // Mock successful API response
     (global.fetch as any).mockResolvedValueOnce({
