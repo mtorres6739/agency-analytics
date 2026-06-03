@@ -36,8 +36,8 @@ Nginx's `proxy_pass` directive lets you forward requests from your domain to Ryb
 
 Add a new location block (or update existing configuration) in your Nginx site configuration:
 
-<Tabs>
-<Tab value="full-proxy-recommended" title="Full Proxy (Recommended)">
+<Tabs items={['Full Proxy (Recommended)', 'Minimal Proxy', 'With Cache Zone']}>
+<Tab>
 
 ```nginx
 # /etc/nginx/sites-available/yourdomain.com
@@ -150,7 +150,7 @@ Replace `app.rybbit.io` with your self-hosted Rybbit instance URL if you're not 
 </Callout>
 
 </Tab>
-<Tab value="minimal-proxy" title="Minimal Proxy">
+<Tab>
 
 Minimal configuration for basic tracking:
 
@@ -187,7 +187,7 @@ server {
 ```
 
 </Tab>
-<Tab value="with-cache-zone" title="With Cache Zone">
+<Tab>
 
 For better performance with caching, define a cache zone:
 

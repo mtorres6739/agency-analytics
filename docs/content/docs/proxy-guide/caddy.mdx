@@ -40,8 +40,8 @@ Caddy automatically obtains and renews SSL certificates from Let's Encrypt. No m
 
 Add or update your Caddyfile with the analytics proxy configuration:
 
-<Tabs>
-<Tab value="full-proxy-recommended" title="Full Proxy (Recommended)">
+<Tabs items={['Full Proxy (Recommended)', 'Minimal Proxy', 'Simplified with Handle Path']}>
+<Tab>
 
 ```txt
 # /etc/caddy/Caddyfile
@@ -132,7 +132,7 @@ Replace `app.rybbit.io` with your self-hosted Rybbit instance URL if you're not 
 </Callout>
 
 </Tab>
-<Tab value="minimal-proxy" title="Minimal Proxy">
+<Tab>
 
 ```txt
 # /etc/caddy/Caddyfile
@@ -161,7 +161,7 @@ yourdomain.com {
 ```
 
 </Tab>
-<Tab value="simplified-with-handle-path" title="Simplified with Handle Path">
+<Tab>
 
 Caddy 2.4+ supports a cleaner syntax with `handle_path`:
 

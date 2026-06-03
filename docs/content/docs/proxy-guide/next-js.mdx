@@ -35,8 +35,8 @@ Next.js rewrites allow you to map incoming request paths to different destinatio
 
 Create or update your `.env` or `.env.local` file with your Rybbit instance URL:
 
-<Tabs>
-<Tab value="cloud-hosted" title="Cloud Hosted">
+<Tabs items={['Cloud Hosted', 'Self-Hosted']}>
+<Tab>
 
 ```bash
 # .env.local
@@ -44,7 +44,7 @@ NEXT_PUBLIC_RYBBIT_HOST=https://app.rybbit.io
 ```
 
 </Tab>
-<Tab value="self-hosted" title="Self-Hosted">
+<Tab>
 
 ```bash
 # .env.local
@@ -64,8 +64,8 @@ The `NEXT_PUBLIC_` prefix makes this environment variable available in both serv
 
 Add or update the `rewrites` function in your `next.config.js` (or `next.config.mjs` for ESM):
 
-<Tabs>
-<Tab value="full-proxy-recommended" title="Full Proxy (Recommended)">
+<Tabs items={['Full Proxy (Recommended)', 'Minimal Proxy', 'ESM (next.config.mjs)']}>
+<Tab>
 
 This configuration proxies all Rybbit endpoints including session replay and Web Vitals:
 
@@ -120,7 +120,7 @@ module.exports = nextConfig;
 ```
 
 </Tab>
-<Tab value="minimal-proxy" title="Minimal Proxy">
+<Tab>
 
 Minimal setup with just script loading and basic event tracking:
 
@@ -157,7 +157,7 @@ This minimal setup won't support session replay or Web Vitals. Use the full prox
 </Callout>
 
 </Tab>
-<Tab value="esm-nextconfigmjs" title="ESM (next.config.mjs)">
+<Tab>
 
 If you're using ES modules:
 
@@ -220,8 +220,8 @@ export default nextConfig;
 
 Update your script tag to load from the proxied path instead of directly from Rybbit:
 
-<Tabs>
-<Tab value="app-router-nextjs-13" title="App Router (Next.js 13+)">
+<Tabs items={['App Router (Next.js 13+)', 'Pages Router', 'JavaScript (No TypeScript)']}>
+<Tab>
 
 Update your root layout file:
 
@@ -252,7 +252,7 @@ export default function RootLayout({
 Replace `YOUR_SITE_ID` with your actual site ID from the Rybbit dashboard.
 
 </Tab>
-<Tab value="pages-router" title="Pages Router">
+<Tab>
 
 Update your `_app.tsx` or `_app.jsx` file:
 
@@ -280,7 +280,7 @@ export default MyApp;
 Replace `YOUR_SITE_ID` with your actual site ID from the Rybbit dashboard.
 
 </Tab>
-<Tab value="javascript-no-typescript" title="JavaScript (No TypeScript)">
+<Tab>
 
 ```jsx
 // app/layout.js or pages/_app.js

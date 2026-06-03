@@ -44,8 +44,8 @@ Log in to Cloudflare Dashboard and create a new Worker:
 
 Replace the default code with the proxy implementation:
 
-<Tabs>
-<Tab value="full-proxy-recommended" title="Full Proxy (Recommended)">
+<Tabs items={['Full Proxy (Recommended)', 'Minimal Proxy', 'With Environment Variables']}>
+<Tab>
 
 ```javascript
 // Cloudflare Worker for Rybbit Analytics Proxy
@@ -143,7 +143,7 @@ async function proxyToRybbit(request, url) {
 ```
 
 </Tab>
-<Tab value="minimal-proxy" title="Minimal Proxy">
+<Tab>
 
 ```javascript
 // Minimal Cloudflare Worker for Rybbit
@@ -181,7 +181,7 @@ async function handleRequest(request) {
 ```
 
 </Tab>
-<Tab value="with-environment-variables" title="With Environment Variables">
+<Tab>
 
 Using Workers secrets for configuration:
 

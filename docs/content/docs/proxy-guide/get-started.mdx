@@ -25,8 +25,8 @@ Before setting up the proxy, ensure you have:
 
 Rybbit uses several endpoints for tracking. You can choose between a minimal setup or full proxy:
 
-<Tabs>
-<Tab value="minimal" title="Minimal Setup">
+<Tabs items={['Minimal Setup', 'Full Setup (Recommended)']}>
+<Tab>
 
 **Required endpoints for basic tracking:**
 
@@ -38,7 +38,7 @@ Rybbit uses several endpoints for tracking. You can choose between a minimal set
 This minimal setup enables basic pageview and event tracking, but won't support session replay or some advanced features.
 
 </Tab>
-<Tab value="full-setup-recommended" title="Full Setup (Recommended)">
+<Tab>
 
 **All endpoints for complete functionality:**
 
@@ -239,8 +239,8 @@ Configure your proxy to maintain persistent connections to Rybbit's backend to r
 
 ## Common Proxy Patterns
 
-<Tabs>
-<Tab value="subdomain-proxy" title="Subdomain Proxy">
+<Tabs items={['Subdomain Proxy', 'Path-Based Proxy']}>
+<Tab>
 
 Use a dedicated subdomain for analytics:
 
@@ -259,7 +259,7 @@ https://analytics.yourdomain.com/track      →  https://app.rybbit.io/api/track
 - Need to manage subdomain DNS
 
 </Tab>
-<Tab value="path-based-proxy" title="Path-Based Proxy">
+<Tab>
 
 Use a path on your main domain:
 
