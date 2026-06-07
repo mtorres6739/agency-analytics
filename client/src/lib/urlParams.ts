@@ -1,134 +1,13 @@
 "use client";
 
-import { DateTime } from "luxon";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQueryStates } from "nuqs";
 import React, { useEffect } from "react";
 import { Time } from "../components/DateSelector/types";
+import { getDashboardTimeForRange, getStoredDashboardDefaultTime } from "./defaultTimeRange";
 import { analyticsParsers } from "./parsers";
 import { getSiteRouteContext, isSyncedAnalyticsRoute } from "./siteRoute";
 import { getTimezone, useStore } from "./store";
-
-// Map of wellKnown presets to their dynamic time calculations
-// Uses timezone-aware dates based on the user's selected timezone
-const wellKnownPresets: Record<string, () => Time> = {
-  today: () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return { mode: "day", day: now.toISODate()!, wellKnown: "today" };
-  },
-  yesterday: () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return { mode: "day", day: now.minus({ days: 1 }).toISODate()!, wellKnown: "yesterday" };
-  },
-  "last-3-days": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "range",
-      startDate: now.minus({ days: 2 }).toISODate()!,
-      endDate: now.toISODate()!,
-      wellKnown: "last-3-days",
-    };
-  },
-  "last-7-days": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "range",
-      startDate: now.minus({ days: 6 }).toISODate()!,
-      endDate: now.toISODate()!,
-      wellKnown: "last-7-days",
-    };
-  },
-  "last-14-days": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "range",
-      startDate: now.minus({ days: 13 }).toISODate()!,
-      endDate: now.toISODate()!,
-      wellKnown: "last-14-days",
-    };
-  },
-  "last-30-days": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "range",
-      startDate: now.minus({ days: 29 }).toISODate()!,
-      endDate: now.toISODate()!,
-      wellKnown: "last-30-days",
-    };
-  },
-  "last-60-days": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "range",
-      startDate: now.minus({ days: 59 }).toISODate()!,
-      endDate: now.toISODate()!,
-      wellKnown: "last-60-days",
-    };
-  },
-  "this-week": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return { mode: "week", week: now.startOf("week").toISODate()!, wellKnown: "this-week" };
-  },
-  "last-week": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "week",
-      week: now.minus({ weeks: 1 }).startOf("week").toISODate()!,
-      wellKnown: "last-week",
-    };
-  },
-  "this-month": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "month",
-      month: now.startOf("month").toISODate()!,
-      wellKnown: "this-month",
-    };
-  },
-  "last-month": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return {
-      mode: "month",
-      month: now.minus({ months: 1 }).startOf("month").toISODate()!,
-      wellKnown: "last-month",
-    };
-  },
-  "this-year": () => {
-    const now = DateTime.now().setZone(getTimezone());
-    return { mode: "year", year: now.startOf("year").toISODate()!, wellKnown: "this-year" };
-  },
-  "last-30-minutes": () => ({
-    mode: "past-minutes",
-    pastMinutesStart: 30,
-    pastMinutesEnd: 0,
-    wellKnown: "last-30-minutes",
-  }),
-  "last-1-hour": () => ({
-    mode: "past-minutes",
-    pastMinutesStart: 60,
-    pastMinutesEnd: 0,
-    wellKnown: "last-1-hour",
-  }),
-  "last-6-hours": () => ({
-    mode: "past-minutes",
-    pastMinutesStart: 360,
-    pastMinutesEnd: 0,
-    wellKnown: "last-6-hours",
-  }),
-  "last-24-hours": () => ({
-    mode: "past-minutes",
-    pastMinutesStart: 1440,
-    pastMinutesEnd: 0,
-    wellKnown: "last-24-hours",
-  }),
-  "all-time": () => ({ mode: "all-time", wellKnown: "all-time" }),
-};
-
-const getDefaultTime = (): Time => ({
-  mode: "day",
-  day: DateTime.now().setZone(getTimezone()).toISODate()!,
-  wellKnown: "today",
-});
 
 // Hook to sync store state with URL
 export const useSyncStateWithUrl = () => {
@@ -163,8 +42,8 @@ export const useSyncStateWithUrl = () => {
     let timeFromUrl: Time | null = null;
 
     // Try to resolve wellKnown preset first
-    if (urlParams.wellKnown && wellKnownPresets[urlParams.wellKnown]) {
-      timeFromUrl = wellKnownPresets[urlParams.wellKnown]();
+    if (urlParams.wellKnown) {
+      timeFromUrl = getDashboardTimeForRange(urlParams.wellKnown, getTimezone());
     } else if (urlParams.timeMode) {
       // Fallback to explicit date parameters
       if (urlParams.timeMode === "day" && urlParams.day) {
@@ -204,7 +83,7 @@ export const useSyncStateWithUrl = () => {
     if (timeFromUrl) {
       setTime(timeFromUrl, !urlParams.bucket);
     } else {
-      setTime(getDefaultTime(), !urlParams.bucket);
+      setTime(getStoredDashboardDefaultTime(getTimezone()), !urlParams.bucket);
     }
 
     // Process bucket separately

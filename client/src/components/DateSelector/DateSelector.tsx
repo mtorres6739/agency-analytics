@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getTimezoneLabel, hour12, timezones } from "@/lib/dateTimeUtils";
+import { setStoredDashboardDefaultTimeRange } from "@/lib/defaultTimeRange";
 import { getTimezone, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Calendar } from "lucide-react";
@@ -46,7 +47,7 @@ const stepDateTimeBucket = (dt: DateTime, bucket: TimeBucket, direction: 1 | -1)
 
 export function DateSelector({
   time,
-  setTime,
+  setTime: setSelectedTime,
   pastMinutesEnabled = true,
 }: {
   time: Time;
@@ -56,26 +57,52 @@ export function DateSelector({
   const { timezone, setTimezone, bucket } = useStore();
   const t = useExtracted();
 
+  const setTime = (nextTime: Time) => {
+    if (nextTime.wellKnown) {
+      setStoredDashboardDefaultTimeRange(nextTime.wellKnown);
+    }
+
+    setSelectedTime(nextTime);
+  };
+
   const getWellKnownLabel = (wellKnown: string): string => {
     switch (wellKnown) {
-      case "today": return t("Today");
-      case "yesterday": return t("Yesterday");
-      case "last-3-days": return t("Last 3 Days");
-      case "last-7-days": return t("Last 7 Days");
-      case "last-14-days": return t("Last 14 Days");
-      case "last-30-days": return t("Last 30 Days");
-      case "last-60-days": return t("Last 60 Days");
-      case "last-30-minutes": return t("Last 30 Minutes");
-      case "last-1-hour": return t("Last 1 Hour");
-      case "last-6-hours": return t("Last 6 Hours");
-      case "last-24-hours": return t("Last 24 Hours");
-      case "this-week": return t("This Week");
-      case "last-week": return t("Last Week");
-      case "this-month": return t("This Month");
-      case "last-month": return t("Last Month");
-      case "this-year": return t("This Year");
-      case "all-time": return t("All Time");
-      default: return wellKnown;
+      case "today":
+        return t("Today");
+      case "yesterday":
+        return t("Yesterday");
+      case "last-3-days":
+        return t("Last 3 Days");
+      case "last-7-days":
+        return t("Last 7 Days");
+      case "last-14-days":
+        return t("Last 14 Days");
+      case "last-30-days":
+        return t("Last 30 Days");
+      case "last-60-days":
+        return t("Last 60 Days");
+      case "last-30-minutes":
+        return t("Last 30 Minutes");
+      case "last-1-hour":
+        return t("Last 1 Hour");
+      case "last-6-hours":
+        return t("Last 6 Hours");
+      case "last-24-hours":
+        return t("Last 24 Hours");
+      case "this-week":
+        return t("This Week");
+      case "last-week":
+        return t("Last Week");
+      case "this-month":
+        return t("This Month");
+      case "last-month":
+        return t("Last Month");
+      case "this-year":
+        return t("This Year");
+      case "all-time":
+        return t("All Time");
+      default:
+        return wellKnown;
     }
   };
 
@@ -368,9 +395,7 @@ export function DateSelector({
         <CustomDateRangePicker setTime={setTime} time={time} />
         <DropdownMenuSeparator />
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            {getTimezoneLabel(timezone)}
-          </DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>{getTimezoneLabel(timezone)}</DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             {timezones.map(tz => (
               <DropdownMenuItem
