@@ -172,6 +172,28 @@ export async function getOverrideSubscription(organizationId: string): Promise<O
 }
 
 /**
+ * Short-lived in-process cache for Stripe subscription lookups, keyed by customer ID.
+ *
+ * Subscription data is read on hot paths (e.g. listing sites on every dashboard load)
+ * but changes rarely, so caching it for a short window collapses repeated reads into a
+ * single Stripe API call and keeps us well under Stripe's request rate limits. Each
+ * worker process keeps its own cache; staleness is bounded by the TTL, and mutations
+ * (plan changes, new checkouts) call invalidateStripeSubscriptionCache to refresh early.
+ */
+const STRIPE_SUBSCRIPTION_CACHE_TTL_MS = 60_000;
+const stripeSubscriptionCache = new Map<string, { value: StripeSubscriptionInfo | null; expiresAt: number }>();
+
+/**
+ * Drops the cached subscription for a customer so the next read fetches fresh data.
+ * Call this after any mutation that changes a customer's subscription.
+ */
+export function invalidateStripeSubscriptionCache(stripeCustomerId: string | null): void {
+  if (stripeCustomerId) {
+    stripeSubscriptionCache.delete(stripeCustomerId);
+  }
+}
+
+/**
  * Gets Stripe subscription info for an organization
  * @returns Stripe subscription info or null if no active subscription found
  */
@@ -180,29 +202,48 @@ export async function getStripeSubscription(stripeCustomerId: string | null): Pr
     return null;
   }
 
+  const cached = stripeSubscriptionCache.get(stripeCustomerId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
   try {
-    // Fetch both active and trialing subscriptions in parallel
-    const [activeSubs, trialSubs] = await Promise.all([
-      (stripe as Stripe).subscriptions.list({
-        customer: stripeCustomerId,
-        status: "active",
-        expand: ["data.plan.product"],
-      }),
-      (stripe as Stripe).subscriptions.list({
-        customer: stripeCustomerId,
-        status: "trialing",
-        expand: ["data.plan.product"],
-      }),
-    ]);
+    const value = await fetchStripeSubscription(stripeCustomerId);
+    stripeSubscriptionCache.set(stripeCustomerId, {
+      value,
+      expiresAt: Date.now() + STRIPE_SUBSCRIPTION_CACHE_TTL_MS,
+    });
+    return value;
+  } catch (error) {
+    console.error("Error fetching Stripe subscription:", error);
+    // On error, fall back to the last cached value (even if expired) rather than
+    // treating the org as having no subscription.
+    return cached?.value ?? null;
+  }
+}
 
-    const allSubs = [...activeSubs.data, ...trialSubs.data];
+/**
+ * Performs the actual Stripe API lookup for a customer's best subscription.
+ * Uses a single list call (status "all") to halve request volume versus separate
+ * active/trialing queries.
+ */
+async function fetchStripeSubscription(stripeCustomerId: string): Promise<StripeSubscriptionInfo | null> {
+  // Fetch active + trialing in a single request and filter locally.
+  const subs = await (stripe as Stripe).subscriptions.list({
+    customer: stripeCustomerId,
+    status: "all",
+    limit: 100,
+    expand: ["data.plan.product"],
+  });
 
-    if (allSubs.length === 0) {
-      return null;
-    }
+  const allSubs = subs.data.filter(sub => sub.status === "active" || sub.status === "trialing");
 
-    // Pick the most recently created subscription across both active and trialing
-    const subscription = allSubs.sort((a, b) => b.created - a.created)[0];
+  if (allSubs.length === 0) {
+    return null;
+  }
+
+  // Pick the most recently created subscription across both active and trialing
+  const subscription = allSubs.sort((a, b) => b.created - a.created)[0];
     const isTrial = subscription.status === "trialing";
 
     const subscriptionItem = subscription.items.data[0];
@@ -257,10 +298,6 @@ export async function getStripeSubscription(stripeCustomerId: string | null): Pr
       createdAt: new Date(subscription.created * 1000),
       ...(isTrial && subscription.trial_end ? { trialEnd: new Date(subscription.trial_end * 1000) } : {}),
     };
-  } catch (error) {
-    console.error("Error fetching Stripe subscription:", error);
-    return null;
-  }
 }
 
 /**
