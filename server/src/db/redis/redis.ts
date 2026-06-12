@@ -20,8 +20,21 @@ function createRedisClient(label: string): Redis {
     retryStrategy: (times: number) => Math.min(times * 200, 5000),
   });
 
-  client.on("error", (error: Error) => logger.error(error, `Redis client error (${label})`));
-  client.on("connect", () => logger.info(`Redis connected (${label})`));
+  // ioredis emits an error on every failed reconnect attempt, which floods the
+  // logs while Redis is unreachable (e.g. local dev without Redis). Log only
+  // when the error changes; a successful connect re-arms logging so the next
+  // outage is still reported.
+  let lastLoggedError: string | undefined;
+  client.on("error", (error: Error) => {
+    const signature = `${(error as NodeJS.ErrnoException).code ?? ""}:${error.message}`;
+    if (signature === lastLoggedError) return;
+    lastLoggedError = signature;
+    logger.error(error, `Redis client error (${label}); suppressing repeats`);
+  });
+  client.on("connect", () => {
+    lastLoggedError = undefined;
+    logger.info(`Redis connected (${label})`);
+  });
 
   return client;
 }
