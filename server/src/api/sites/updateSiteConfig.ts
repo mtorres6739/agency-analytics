@@ -1,10 +1,12 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db } from "../../db/postgres/postgres.js";
-import { sites } from "../../db/postgres/schema.js";
+import { organization, sites } from "../../db/postgres/schema.js";
 import { eq } from "drizzle-orm";
+import { IS_CLOUD } from "../../lib/const.js";
 import { siteConfig } from "../../lib/siteConfig.js";
 import { validateIPPattern } from "../../lib/ipUtils.js";
+import { getBestSubscription, subscriptionIncludesReplay } from "../../lib/subscriptionUtils.js";
 
 // Schema for the update request - all fields are optional but validated when present
 const updateSiteConfigSchema = z.object({
@@ -109,6 +111,27 @@ export async function updateSiteConfig(
         success: false,
         error: "Session replay and Web Vitals are only available for web sites",
       });
+    }
+
+    // Session replay is a Pro feature — block enabling it (turning it off is always allowed)
+    if (IS_CLOUD && updateData.sessionReplay === true) {
+      let includesReplay = false;
+      if (site.organizationId) {
+        const orgResult = await db
+          .select({ stripeCustomerId: organization.stripeCustomerId })
+          .from(organization)
+          .where(eq(organization.id, site.organizationId))
+          .limit(1);
+        const subscription = await getBestSubscription(site.organizationId, orgResult[0]?.stripeCustomerId ?? null);
+        includesReplay = subscriptionIncludesReplay(subscription);
+      }
+
+      if (!includesReplay) {
+        return reply.status(403).send({
+          success: false,
+          error: "Session replay requires a Pro plan",
+        });
+      }
     }
 
     // Additional validation for excluded IPs if provided

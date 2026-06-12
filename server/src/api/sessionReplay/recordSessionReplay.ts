@@ -54,6 +54,13 @@ export async function recordSessionReplay(
       return reply.status(200).send("Site over monthly limit, event not tracked");
     }
 
+    // Check if the site's plan includes session replay (e.g. it may have been
+    // enabled before a downgrade from Pro)
+    if (usageService.isSiteWithoutReplay(Number(siteId))) {
+      logger.info(`[SessionReplay] Skipping event for site ${siteId} - plan does not include session replay`);
+      return reply.status(200).send({ success: true, message: "Session replay not included in plan" });
+    }
+
     const body = recordSessionReplaySchema.parse(request.body) as RecordSessionReplayRequest;
 
     // Check if the IP should be excluded from tracking

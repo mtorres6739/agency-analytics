@@ -254,8 +254,7 @@ export async function getAllStripeSubscriptionsByCustomer(): Promise<Map<string,
         limit: 100,
         expand: ["data.plan.product"],
       })) {
-        const customerId =
-          typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+        const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
         const existing = byCustomer.get(customerId);
         if (!existing || rankSubscription(subscription) > rankSubscription(existing)) {
           byCustomer.set(customerId, subscription);
@@ -527,6 +526,32 @@ export async function getBestSubscriptionFromStripeSub(
   }
 
   return freeSubscription();
+}
+
+/**
+ * Whether a subscription's plan includes session replay.
+ *
+ * Replays are a Pro feature (see pricing page / PRO_FEATURES). This mirrors the
+ * client-side gate in EnableSessionReplay/TrackingTab, including the exclusion of
+ * large (>=500k event) trials. The per-plan `limits.replays` numbers in const.ts are
+ * a volume quota, not an entitlement — basic/standard plans carry them but do not
+ * include the feature.
+ */
+export function subscriptionIncludesReplay(subscription: SubscriptionInfo): boolean {
+  switch (subscription.source) {
+    case "custom":
+      // Bespoke enterprise plans include everything in Pro
+      return true;
+    case "override":
+      return subscription.planName.includes("pro");
+    case "stripe": {
+      const isLargeTrial = subscription.status === "trialing" && subscription.eventLimit >= 500_000;
+      return subscription.planName.includes("pro") && !isLargeTrial;
+    }
+    case "appsumo":
+    case "free":
+      return false;
+  }
 }
 
 function freeSubscription(): FreeSubscriptionInfo {

@@ -13,12 +13,17 @@ import {
   getAllStripeSubscriptionsByCustomer,
   getBestSubscriptionFromStripeSub,
   stripeSubscriptionInfoFromSnapshot,
+  subscriptionIncludesReplay,
+  SubscriptionInfo,
 } from "../lib/subscriptionUtils.js";
 
 type UsageUpdateCallback = () => void;
 
 class UsageService {
   private sitesOverLimit = new Set<number>();
+  // Sites whose organization's plan does not include session replay. Empty until the
+  // usage cron runs (and always empty when self-hosted), so enforcement fails open.
+  private sitesWithoutReplay = new Set<number>();
   private usageCheckTask: cron.ScheduledTask | null = null;
   private logger = createServiceLogger("usage-checker");
   private onUsageUpdatedCallbacks: UsageUpdateCallback[] = [];
@@ -30,6 +35,13 @@ class UsageService {
    */
   public setSitesOverLimit(sites: Set<number>): void {
     this.sitesOverLimit = sites;
+  }
+
+  /**
+   * Sets the sitesWithoutReplay set (used by workers receiving IPC updates from primary)
+   */
+  public setSitesWithoutReplay(sites: Set<number>): void {
+    this.sitesWithoutReplay = sites;
   }
 
   /**
@@ -74,6 +86,20 @@ class UsageService {
    */
   public isSiteOverLimit(siteId: number): boolean {
     return this.sitesOverLimit.has(siteId);
+  }
+
+  /**
+   * Gets the set of site IDs whose plan does not include session replay
+   */
+  public getSitesWithoutReplay(): Set<number> {
+    return this.sitesWithoutReplay;
+  }
+
+  /**
+   * Checks if a site's plan excludes session replay
+   */
+  public isSiteWithoutReplay(siteId: number): boolean {
+    return this.sitesWithoutReplay.has(siteId);
   }
 
   /**
@@ -124,9 +150,7 @@ class UsageService {
   }
 
   /**
-   * Gets event limit and billing period start date for an organization based on their best subscription.
-   * Checks both AppSumo and Stripe subscriptions and uses the one with the higher event limit.
-   * @returns [eventLimit, periodStartDate]
+   * Resolves an organization's best subscription (custom plan / override / Stripe / AppSumo / free).
    */
   private async getOrganizationSubscriptionInfo(
     orgData: {
@@ -136,7 +160,7 @@ class UsageService {
       name: string;
     },
     stripeSubscriptions: Map<string, Stripe.Subscription>
-  ): Promise<[number, string | null]> {
+  ): Promise<SubscriptionInfo> {
     // Resolve this org's Stripe subscription from the bulk snapshot (no per-org Stripe call),
     // then layer in custom plan / override / AppSumo via the same priority rules as elsewhere.
     const stripeSub = stripeSubscriptionInfoFromSnapshot(stripeSubscriptions, orgData.stripeCustomerId);
@@ -155,7 +179,7 @@ class UsageService {
       this.logger.info(`Organization ${orgData.name} on free tier with ${subscription.eventLimit} events/month`);
     }
 
-    return [subscription.eventLimit, subscription.periodStart];
+    return subscription;
   }
 
   /**
@@ -258,8 +282,10 @@ class UsageService {
           const wasOverLimit = orgData.overMonthlyLimit ?? false;
           const alreadyNotifiedApproaching = orgData.approachingLimitNotifiedPeriodStart === monthStart;
 
-          const [eventLimit] = await this.getOrganizationSubscriptionInfo(orgData, stripeSubscriptions);
+          const subscription = await this.getOrganizationSubscriptionInfo(orgData, stripeSubscriptions);
+          const eventLimit = subscription.eventLimit;
           const isOverLimit = eventCount > eventLimit;
+          const includesReplay = subscriptionIncludesReplay(subscription);
 
           let sendApproaching = false;
           if (!alreadyNotifiedApproaching && !isOverLimit && Number.isFinite(eventLimit) && daysRemaining >= 2) {
@@ -336,6 +362,16 @@ class UsageService {
             }
           }
 
+          // Track sites whose plan doesn't include session replay so ingest/config
+          // endpoints can stop recording for them (e.g. after a downgrade from Pro)
+          for (const siteId of siteIds) {
+            if (includesReplay) {
+              this.sitesWithoutReplay.delete(siteId);
+            } else {
+              this.sitesWithoutReplay.add(siteId);
+            }
+          }
+
           this.logger.info(
             `Updated organization ${orgData.name}: ${eventCount.toLocaleString()} events, limit ${eventLimit.toLocaleString()}`
           );
@@ -344,7 +380,10 @@ class UsageService {
         }
       }
 
-      this.logger.info(`Completed monthly event usage check. ${this.sitesOverLimit.size} sites are over their limit.`);
+      this.logger.info(
+        `Completed monthly event usage check. ${this.sitesOverLimit.size} sites are over their limit, ` +
+          `${this.sitesWithoutReplay.size} sites lack session replay access.`
+      );
 
       // Notify listeners (e.g., cluster primary broadcasts to workers)
       for (const callback of this.onUsageUpdatedCallbacks) {

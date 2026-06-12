@@ -492,6 +492,9 @@ const start = async () => {
         if (message?.type === "sites-over-limit") {
           usageService.setSitesOverLimit(new Set(message.siteIds));
           server.log.debug(`Received ${message.siteIds.length} sites-over-limit from primary`);
+        } else if (message?.type === "sites-without-replay") {
+          usageService.setSitesWithoutReplay(new Set(message.siteIds));
+          server.log.debug(`Received ${message.siteIds.length} sites-without-replay from primary`);
         }
       });
     }

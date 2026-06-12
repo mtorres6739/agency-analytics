@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { siteConfig } from "../../lib/siteConfig.js";
+import { usageService } from "../../services/usageService.js";
 
 export async function getTrackingConfig(request: FastifyRequest<{ Params: { siteId: string } }>, reply: FastifyReply) {
   try {
@@ -10,11 +11,18 @@ export async function getTrackingConfig(request: FastifyRequest<{ Params: { site
       return reply.status(404).send({ error: "Site not found" });
     }
 
+    // Report replay as off when the plan doesn't include it so the tracking script
+    // never loads the recorder (replay payloads would be dropped at ingest anyway)
+    const sessionReplay =
+      config.type === "mobile"
+        ? false
+        : (config.sessionReplay && !usageService.isSiteWithoutReplay(config.siteId)) || false;
+
     // Return tracking configuration
     // This endpoint is public since the analytics script needs to fetch it
     return reply.send({
       type: config.type,
-      sessionReplay: config.type === "mobile" ? false : config.sessionReplay || false,
+      sessionReplay,
       webVitals: config.type === "mobile" ? false : config.webVitals || false,
       trackErrors: config.trackErrors || false,
       trackOutbound: config.trackOutbound ?? true,
