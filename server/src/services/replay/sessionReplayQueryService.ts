@@ -45,13 +45,8 @@ export class SessionReplayQueryService {
     // Build the base query for session IDs that have replay events
     let sessionIdsSubquery = `
       SELECT DISTINCT session_id
-      FROM events
-      WHERE site_id = {siteId:UInt16}
-        AND session_id IN (
-          SELECT DISTINCT session_id
-          FROM session_replay_events
-          WHERE site_id = {siteId:UInt16} AND event_type = '2'
-        )
+      FROM session_replay_events
+      WHERE site_id = {siteId:UInt16} AND event_type = '2'
     `;
 
     // If filters are present, we need to further filter by sessions that match the filter criteria
