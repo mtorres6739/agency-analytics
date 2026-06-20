@@ -16,6 +16,9 @@ export interface SiteConfigData {
   blockBots: boolean;
   excludedIPs: string[];
   excludedCountries: string[];
+  excludedPaths: string[];
+  excludedHostnames: string[];
+  excludedUserAgents: string[];
   privateLinkKey?: string | null;
   sessionReplay: boolean;
   webVitals: boolean;
@@ -100,6 +103,9 @@ class SiteConfig {
         blockBots: site.blockBots === undefined ? true : site.blockBots,
         excludedIPs: Array.isArray(site.excludedIPs) ? site.excludedIPs : [],
         excludedCountries: Array.isArray(site.excludedCountries) ? site.excludedCountries : [],
+        excludedPaths: Array.isArray(site.excludedPaths) ? site.excludedPaths : [],
+        excludedHostnames: Array.isArray(site.excludedHostnames) ? site.excludedHostnames : [],
+        excludedUserAgents: Array.isArray(site.excludedUserAgents) ? site.excludedUserAgents : [],
         privateLinkKey: site.privateLinkKey,
         sessionReplay: site.sessionReplay || false,
         webVitals: site.webVitals || false,
@@ -223,6 +229,94 @@ class SiteConfig {
     // Convert to uppercase for case-insensitive comparison
     const normalizedCountry = countryIso.toUpperCase();
     return excludedCountries.some(country => country.toUpperCase() === normalizedCountry);
+  }
+
+  /**
+   * Check if a pathname matches any of the excluded path glob patterns.
+   * Patterns support `*` as a wildcard (e.g. "/admin/*", "/preview"). Matching is case-insensitive.
+   */
+  async isPathExcluded(pathname: string | undefined, siteIdOrId?: string | number): Promise<boolean> {
+    if (!siteIdOrId || !pathname) return false;
+    const config = await this.getSiteByAnyId(siteIdOrId);
+    const excludedPaths = config?.excludedPaths || [];
+    return excludedPaths.some(pattern => this.matchesGlob(pathname, pattern));
+  }
+
+  /**
+   * Check if a hostname matches any of the excluded hostname glob patterns.
+   * Patterns support `*` as a wildcard (e.g. "localhost", "*.vercel.app"). Matching is case-insensitive.
+   */
+  async isHostnameExcluded(hostname: string | undefined, siteIdOrId?: string | number): Promise<boolean> {
+    if (!siteIdOrId || !hostname) return false;
+    const config = await this.getSiteByAnyId(siteIdOrId);
+    const excludedHostnames = config?.excludedHostnames || [];
+    return excludedHostnames.some(pattern => this.matchesGlob(hostname, pattern));
+  }
+
+  /**
+   * Check if a user-agent string contains any of the excluded substrings.
+   * Matching is a case-insensitive substring test (e.g. "HeadlessChrome").
+   */
+  async isUserAgentExcluded(userAgent: string | undefined, siteIdOrId?: string | number): Promise<boolean> {
+    if (!siteIdOrId || !userAgent) return false;
+    const config = await this.getSiteByAnyId(siteIdOrId);
+    const excludedUserAgents = config?.excludedUserAgents || [];
+    const normalizedUserAgent = userAgent.toLowerCase();
+    return excludedUserAgents.some(substring => {
+      const trimmed = substring.trim().toLowerCase();
+      return trimmed.length > 0 && normalizedUserAgent.includes(trimmed);
+    });
+  }
+
+  /**
+   * Case-insensitive glob match where `*` matches any sequence of characters
+   * (including the empty string). A pattern with no wildcards must match the
+   * whole value exactly.
+   *
+   * Implemented as a linear two-pointer scan rather than a compiled RegExp so
+   * that, on the hot ingestion path, we (1) never recompile a pattern per event
+   * and (2) can't trigger catastrophic backtracking — matching is bounded to
+   * O(value.length * pattern.length) regardless of how many wildcards a pattern
+   * contains. Every character other than `*` is treated as a literal.
+   */
+  private matchesGlob(value: string, pattern: string): boolean {
+    const glob = pattern.trim().toLowerCase();
+    if (!glob) return false;
+
+    const text = value.toLowerCase();
+
+    let textIdx = 0;
+    let globIdx = 0;
+    let lastStarGlobIdx = -1;
+    let textIdxAfterStar = 0;
+
+    while (textIdx < text.length) {
+      if (globIdx < glob.length && glob[globIdx] === text[textIdx]) {
+        // Literal character match — advance both pointers.
+        textIdx++;
+        globIdx++;
+      } else if (globIdx < glob.length && glob[globIdx] === "*") {
+        // Record this star and tentatively let it match nothing.
+        lastStarGlobIdx = globIdx;
+        textIdxAfterStar = textIdx;
+        globIdx++;
+      } else if (lastStarGlobIdx !== -1) {
+        // Mismatch, but the most recent star can absorb one more character.
+        globIdx = lastStarGlobIdx + 1;
+        textIdxAfterStar++;
+        textIdx = textIdxAfterStar;
+      } else {
+        return false;
+      }
+    }
+
+    // The value is consumed; the match holds only if the rest of the pattern is
+    // entirely trailing stars.
+    while (globIdx < glob.length && glob[globIdx] === "*") {
+      globIdx++;
+    }
+
+    return globIdx === glob.length;
   }
 
   /**
