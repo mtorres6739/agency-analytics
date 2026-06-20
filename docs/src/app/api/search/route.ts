@@ -6,16 +6,16 @@ import { createFromSource } from 'fumadocs-core/search/server';
 // once and runs Orama in the browser, so there are no per-keystroke round-trips.
 export const revalidate = false;
 
-export const { staticGET: GET } = createFromSource(source, {
-  // The source declares 10 i18n languages, so search builds one index per
-  // locale. Orama has no stemmer for these languages, which throws
-  // `Language "<x>" is not supported` and breaks the static index export.
-  // The docs are English-only, so fall back to the English tokenizer for them.
-  // https://docs.orama.com/open-source/supported-languages
-  localeMap: {
-    zh: 'english',
-    pl: 'english',
-    ko: 'english',
-    ja: 'english',
-  },
-});
+// The docs source declares 10 i18n languages but the docs themselves are
+// English-only — Fumadocs' i18n fallback would otherwise index the full English
+// content once per locale, producing a ~61MB index (10x duplication) that the
+// static client has to download. We restrict search to a single English index:
+// the `en` locale matches directly, and the static client falls back to it for
+// every other locale, so search returns the (English) docs on every page.
+const englishOnlySource = {
+  ...source,
+  _i18n: { ...source._i18n, languages: ['en'], defaultLanguage: 'en' },
+  getPages: () => source.getPages('en'),
+};
+
+export const { staticGET: GET } = createFromSource(englishOnlySource);

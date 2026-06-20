@@ -1,5 +1,8 @@
 {
   "title": "Documentation",
+  "description": "Guides, setup, and feature documentation",
+  "icon": "Book",
+  "root": true,
   "pages": [
     "index",
     "comparison",
@@ -15,7 +18,6 @@
     "guides",
     "proxy-guide",
     "sdks",
-    "api",
     "hiding-own-traffic",
     "filter-traffic",
     "bot-detection",

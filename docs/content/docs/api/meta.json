@@ -1,4 +1,7 @@
 {
-  "title": "API",
+  "title": "API Reference",
+  "description": "REST API endpoints and authentication",
+  "icon": "Terminal",
+  "root": true,
   "pages": ["getting-started", "sending-events", "stats", "organizations", "sites"]
 }
