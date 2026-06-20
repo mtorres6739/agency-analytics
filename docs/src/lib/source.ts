@@ -1,3 +1,4 @@
+import { ApiSidebarLabel } from '@/components/ApiMethodBadge';
 import { docs, meta } from '@/.source';
 import { InferPageType, loader } from 'fumadocs-core/source';
 import { toFumadocsSource } from 'fumadocs-mdx/runtime/server';
@@ -15,6 +16,29 @@ export const source = loader({
     if (icon && icon in icons) {
       return createElement(icons[icon as keyof typeof icons]);
     }
+  },
+  pageTree: {
+    // Append an HTTP method badge to sidebar items whose page has a `method`
+    // frontmatter field (the API endpoint pages).
+    transformers: [
+      {
+        file(node, filePath) {
+          if (!filePath) return node;
+          const file = this.storage.read(filePath);
+          const method =
+            file?.format === 'page'
+              ? (file.data as { method?: string }).method
+              : undefined;
+          if (method) {
+            node.name = createElement(ApiSidebarLabel, {
+              method,
+              children: node.name,
+            });
+          }
+          return node;
+        },
+      },
+    ],
   },
   source: toFumadocsSource(docs, meta),
 });

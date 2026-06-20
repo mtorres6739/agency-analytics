@@ -3,5 +3,21 @@
   "description": "REST API endpoints and authentication",
   "icon": "Terminal",
   "root": true,
-  "pages": ["getting-started", "sending-events", "stats", "organizations", "sites"]
+  "pages": [
+    "getting-started",
+    "sending-events",
+    "---Analytics---",
+    "overview",
+    "sessions",
+    "users",
+    "events",
+    "goals",
+    "funnels",
+    "performance",
+    "errors",
+    "insights",
+    "---Management---",
+    "organizations",
+    "sites"
+  ]
 }

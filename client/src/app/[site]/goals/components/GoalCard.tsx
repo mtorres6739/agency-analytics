@@ -117,7 +117,7 @@ function GoalMetricBarChart({
   const metricLabel = metric === "conversions" ? t("Conversions") : t("Conversion Rate");
 
   return (
-    <div className="hidden md:flex h-8 w-48 shrink-0 items-end gap-px">
+    <div className="hidden lg:flex h-8 w-32 xl:w-44 shrink-0 items-end gap-px">
       {bars.map((bar, index) => {
         const height = max > 0 ? Math.max(10, (bar.value / max) * 100) : 10;
 
@@ -202,7 +202,7 @@ export default function GoalCard({ goal, siteId, timeSeries, isLoadingTimeSeries
           onClick={toggleExpansion}
         >
           {/* Left section - Title and type */}
-          <div className="w-full min-w-0 md:flex-1 md:pr-4">
+          <div className=" min-w-0 md:flex-1 md:pr-4">
             <h3 className="font-medium text-base flex items-center gap-2 min-w-0">
               {goal.goalType === "path" ? (
                 <Tooltip>
@@ -243,8 +243,8 @@ export default function GoalCard({ goal, siteId, timeSeries, isLoadingTimeSeries
             </div>
           </div>
           {/* Center section - Stats */}
-          <div className="w-full md:flex-1 flex justify-start md:justify-center">
-            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:w-auto md:gap-4">
+          <div className="w-full min-w-0 md:flex-1 flex justify-start md:justify-center">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4 md:gap-6">
               <div className="flex items-center gap-3">
                 <GoalMetricBarChart data={timeSeries} metric="conversions" isLoading={isLoadingTimeSeries} />
                 <div className="min-w-[86px] text-left">
