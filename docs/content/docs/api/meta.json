@@ -5,8 +5,8 @@
   "root": true,
   "pages": [
     "getting-started",
+    "---Endpoints---",
     "sending-events",
-    "---Analytics---",
     "overview",
     "sessions",
     "session-replay",
