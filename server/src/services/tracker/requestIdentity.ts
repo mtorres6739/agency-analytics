@@ -1,5 +1,5 @@
 import { FastifyRequest } from "fastify";
-import { getIpAddress } from "../../utils.js";
+import { resolveClientIp } from "./resolveClientIp.js";
 
 interface TrackingIdentityPayload {
   ip_address?: string;
@@ -24,7 +24,7 @@ export function resolveTrackingIdentity(
   payload: TrackingIdentityPayload,
   trustedServerSideIngestion: boolean
 ): TrackingIdentity {
-  const requestIpAddress = getIpAddress(request);
+  const requestIpAddress = resolveClientIp(request);
   const requestUserAgent = getRequestUserAgent(request);
 
   return {

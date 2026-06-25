@@ -179,7 +179,7 @@ For accurate tracking, ensure these headers are forwarded to the Rybbit backend:
 
 ### Forwarded IP Headers
 
-If your proxy runs on infrastructure such as Cloudflare Workers, AWS CloudFront, Fastly, or another edge/CDN provider, make sure the proxy sets `X-Real-IP` to the original visitor IP. Rybbit also falls back to `X-Forwarded-For`, but `X-Real-IP` is preferred because Cloudflare-fronted requests may include intermediary IPs in `X-Forwarded-For`.
+If your proxy runs on infrastructure such as Cloudflare Workers, AWS CloudFront, Fastly, or another edge/CDN provider, make sure the proxy sets `X-Forwarded-For` (or `X-Real-IP`) to the original visitor IP. Rybbit reads both **before** the connecting edge IP, so this prevents traffic from being geolocated to the proxy's exit node. `X-Real-IP` takes precedence if both are present, but `X-Forwarded-For` is fully supported and is the right choice on platforms that can't set `X-Real-IP` — notably AWS CloudFront, where `X-Real-IP` is on the [origin custom-header denylist](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/add-origin-custom-headers.html#add-origin-custom-headers-denylist).
 
 **Cloudflare Worker example:**
 
@@ -193,8 +193,16 @@ proxyHeaders.set('X-Forwarded-For', clientIp);
 
 **CloudFront example:**
 
-- Forward `X-Forwarded-For`, or set `X-Real-IP` to the viewer IP from a CloudFront Function/Lambda@Edge
+- Set `X-Forwarded-For` to the viewer IP from a CloudFront Function/Lambda@Edge (CloudFront cannot forward `X-Real-IP`)
 - Forward `User-Agent`, `Referer`, and `Accept-Language`
+
+```javascript
+// CloudFront Function (viewer-request)
+function handler(event) {
+  event.request.headers["x-forwarded-for"] = { value: event.viewer.ip };
+  return event.request;
+}
+```
 
 ## Bandwidth Considerations
 

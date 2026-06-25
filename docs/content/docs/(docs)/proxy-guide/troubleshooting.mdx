@@ -178,7 +178,7 @@ proxy_pass https://app.rybbit.io;
 **Solutions:**
 
 <Callout type="warn">
-**Critical**: The `X-Real-IP` header should contain the original client IP for accurate geolocation and user identification. `X-Forwarded-For` is supported as a fallback, but may include intermediary edge IPs.
+**Critical**: The `X-Forwarded-For` (or `X-Real-IP`) header must contain the original client IP for accurate geolocation and user identification. Rybbit reads both before the connecting edge IP. On AWS CloudFront use `X-Forwarded-For` — it cannot forward `X-Real-IP`.
 </Callout>
 
 **Nginx:**
@@ -225,7 +225,7 @@ proxyHeaders.set('X-Real-IP', clientIp);
 
 **Cause:** Rybbit is seeing the proxy IP instead of the original visitor IP. This is common when a first-party proxy is hosted on CDN or cloud infrastructure. Those networks use hosting/datacenter ASNs, so traffic can look like bot infrastructure if the visitor IP is not passed in a trusted way.
 
-Set `X-Real-IP` to the original visitor IP before forwarding the request to Rybbit. Also setting `X-Forwarded-For` is fine, but `X-Real-IP` is the preferred header for first-party proxies.
+Set `X-Forwarded-For` (or `X-Real-IP`) to the original visitor IP before forwarding the request to Rybbit. Rybbit reads both before the connecting edge IP. `X-Real-IP` wins if both are present, but `X-Forwarded-For` is fully supported — use it on AWS CloudFront, which cannot forward `X-Real-IP`.
 
 **Cloudflare Workers:**
 
@@ -239,8 +239,16 @@ proxyHeaders.set('X-Forwarded-For', clientIp);
 
 **AWS CloudFront:**
 
-- Forward `X-Forwarded-For`, or set `X-Real-IP` to the viewer IP from a CloudFront Function/Lambda@Edge
+- Set `X-Forwarded-For` to the viewer IP from a CloudFront Function/Lambda@Edge (CloudFront cannot forward `X-Real-IP`)
 - Forward `User-Agent`, `Referer`, and `Accept-Language`
+
+```javascript
+// CloudFront Function (viewer-request)
+function handler(event) {
+  event.request.headers["x-forwarded-for"] = { value: event.viewer.ip };
+  return event.request;
+}
+```
 
 ---
 

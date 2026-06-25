@@ -4,7 +4,7 @@ import { siteConfig } from "../../lib/siteConfig.js";
 import { SessionReplayIngestService } from "../../services/replay/sessionReplayIngestService.js";
 import { usageService } from "../../services/usageService.js";
 import { RecordSessionReplayRequest } from "../../types/sessionReplay.js";
-import { getIpAddress } from "../../utils.js";
+import { resolveClientIp } from "../../services/tracker/resolveClientIp.js";
 import { logger } from "../../lib/logger/logger.js";
 import { getLocation } from "../../db/geolocation/geolocation.js";
 
@@ -93,7 +93,7 @@ export async function recordSessionReplay(
     const body = recordSessionReplaySchema.parse(request.body) as RecordSessionReplayRequest;
 
     // Check if the IP should be excluded from tracking
-    const requestIP = getIpAddress(request);
+    const requestIP = resolveClientIp(request);
 
     if (excludedIPs && excludedIPs.length > 0 && (await siteConfig.isIPExcluded(requestIP, request.params.siteId))) {
       logger.info(`[SessionReplay] IP ${requestIP} excluded from tracking for site ${siteId}`);
@@ -161,7 +161,7 @@ export async function recordSessionReplay(
       }
     }
 
-    const ipAddress = getIpAddress(request);
+    const ipAddress = resolveClientIp(request);
     const origin = request.headers.origin || "";
     const referrer = request.headers.referer || "";
 

@@ -10,7 +10,8 @@ import { featureFlags, userProfiles } from "../../db/postgres/schema.js";
 import { siteConfig } from "../../lib/siteConfig.js";
 import { getRequestUserAgent } from "../../services/tracker/requestIdentity.js";
 import { processResults } from "../analytics/utils/utils.js";
-import { getDeviceType, getIpAddress } from "../../utils.js";
+import { getDeviceType } from "../../utils.js";
+import { resolveClientIp } from "../../services/tracker/resolveClientIp.js";
 import { evaluateFeatureFlagsForSite } from "../../services/featureFlags/evaluator.js";
 import {
   evaluateFeatureFlagsSchema,
@@ -297,7 +298,7 @@ async function evaluateFeatureFlagsForRuntime(
       return reply.status(404).send({ error: "Site not found" });
     }
 
-    const ipAddress = getIpAddress(request);
+    const ipAddress = resolveClientIp(request);
     const [locationByIp, profile] = await Promise.all([
       getLocation([ipAddress]).catch(() => ({}) as Awaited<ReturnType<typeof getLocation>>),
       body.identifiedUserId

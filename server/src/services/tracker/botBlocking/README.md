@@ -100,6 +100,6 @@ This catches obvious floods and fast crawlers, but it is local to a Node process
 
 ## Trust Boundaries
 
-Bot blocking assumes the resolved IP is meaningful. The tracker resolves IPs from `X-Real-IP`, then `CF-Connecting-IP`, then `X-Forwarded-For`, then the Fastify request IP. Public tracking requests ignore client-supplied `ip_address` and `user_agent`; those overrides are only honored for trusted server-side ingestion.
+Bot blocking assumes the resolved IP is meaningful. The tracker resolves IPs from `X-Real-IP`, then `X-Forwarded-For`, then `CF-Connecting-IP`, then the Fastify request IP. The forwarded headers rank above `CF-Connecting-IP` so that first-party proxies (CloudFront, Fastly, nginx, ...) are attributed to the original visitor rather than the proxy's edge node. Public tracking requests ignore client-supplied `ip_address` and `user_agent`; those overrides are only honored for trusted server-side ingestion.
 
 Client-supplied `_bs` and `_bsm` are useful inputs but are not secure proof.

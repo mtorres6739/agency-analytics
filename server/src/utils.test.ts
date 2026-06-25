@@ -7,7 +7,7 @@ function requestWithHeaders(headers: Record<string, string | string[]>, ip = "19
 }
 
 describe("getIpAddress", () => {
-  it("uses X-Real-IP before Cloudflare's connecting IP", () => {
+  it("uses X-Real-IP before all other headers", () => {
     const request = requestWithHeaders({
       "cf-connecting-ip": "198.51.100.20",
       "x-forwarded-for": "203.0.113.10, 198.51.100.20",
@@ -17,19 +17,20 @@ describe("getIpAddress", () => {
     expect(getIpAddress(request)).toBe("192.0.2.10");
   });
 
-  it("uses Cloudflare's connecting IP before X-Forwarded-For", () => {
+  it("uses the first X-Forwarded-For IP before Cloudflare's connecting IP", () => {
+    // The proxied case: a first-party proxy (e.g. CloudFront) forwards the visitor
+    // in X-Forwarded-For, while CF-Connecting-IP is our Cloudflare edge seeing the
+    // proxy's egress node. The visitor must win.
     const request = requestWithHeaders({
-      "cf-connecting-ip": "203.0.113.10",
-      "x-forwarded-for": "198.51.100.20, 10.0.0.1",
+      "cf-connecting-ip": "198.51.100.20",
+      "x-forwarded-for": "203.0.113.10, 198.51.100.20",
     });
 
     expect(getIpAddress(request)).toBe("203.0.113.10");
   });
 
-  it("uses the first X-Forwarded-For IP when higher-priority headers are missing", () => {
-    expect(getIpAddress(requestWithHeaders({ "x-forwarded-for": "203.0.113.10, 198.51.100.20" }))).toBe(
-      "203.0.113.10"
-    );
+  it("falls back to Cloudflare's connecting IP when no forwarded headers are present", () => {
+    expect(getIpAddress(requestWithHeaders({ "cf-connecting-ip": "203.0.113.10" }))).toBe("203.0.113.10");
   });
 
   it("falls back to the request IP", () => {

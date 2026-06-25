@@ -6,7 +6,7 @@ import { clickhouse } from "../../db/clickhouse/clickhouse.js";
 import { userProfiles, userAliases } from "../../db/postgres/schema.js";
 import { siteConfig } from "../../lib/siteConfig.js";
 import { userIdService } from "../userId/userIdService.js";
-import { getIpAddress } from "../../utils.js";
+import { resolveClientIp } from "./resolveClientIp.js";
 import { createServiceLogger } from "../../lib/logger/logger.js";
 
 const logger = createServiceLogger("identify-service");
@@ -89,7 +89,7 @@ export async function handleIdentify(request: FastifyRequest, reply: FastifyRepl
     const anonymousId = anonymous_id
       ? await userIdService.generateUserIdFromClientId(anonymous_id, siteId)
       : await userIdService.generateUserId(
-          ip_address || getIpAddress(request),
+          ip_address || resolveClientIp(request),
           user_agent || request.headers["user-agent"] || "",
           siteId
         );
