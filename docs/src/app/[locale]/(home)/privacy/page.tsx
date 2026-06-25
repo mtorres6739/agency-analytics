@@ -18,7 +18,7 @@ export default function PrivacyPolicy() {
 
       <div className="prose prose-invert max-w-none">
         <p className="text-lg">
-          Last updated: August 22, 2025
+          Last updated: June 25, 2026
         </p>
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">Overview</h2>
@@ -94,8 +94,10 @@ export default function PrivacyPolicy() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">Data Retention</h2>
         <p>
-          For self-hosted instances, data retention is configurable by the administrator. For our cloud service, we
-          retain analytics data for 12 months by default, after which it is automatically deleted.
+          For self-hosted instances, data retention is configurable by the administrator. For our cloud service,
+          retention depends on your plan: Standard plans retain analytics data for 3 years and Pro plans retain it for 5
+          years, while Enterprise plans retain data indefinitely. Once the applicable retention period is reached, data
+          is automatically deleted.
         </p>
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">GDPR and Privacy Regulations Compliance</h2>
