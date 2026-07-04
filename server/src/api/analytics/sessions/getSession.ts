@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { clickhouse } from "../../../db/clickhouse/clickhouse.js";
+import { SESSION_CHANNEL_AGG, SESSION_REFERRER_AGG } from "../utils/sessionAttribution.js";
 import { processResults } from "../utils/utils.js";
 
 export interface SessionDetails {
@@ -92,8 +93,8 @@ SELECT
     any(operating_system_version) as operating_system_version,
     any(screen_width) as screen_width,
     any(screen_height) as screen_height,
-    argMin(referrer, timestamp) as referrer,
-    argMin(channel, timestamp) as channel,
+    ${SESSION_REFERRER_AGG} as referrer,
+    ${SESSION_CHANNEL_AGG} as channel,
     min(timestamp) as session_start,
     max(timestamp) as session_end,
     dateDiff('second', min(timestamp), max(timestamp)) as session_duration,

@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { clickhouse } from "../../../db/clickhouse/clickhouse.js";
 import { db } from "../../../db/postgres/postgres.js";
 import { userProfiles, userAliases } from "../../../db/postgres/schema.js";
+import { SESSION_CHANNEL_AGG, SESSION_REFERRER_AGG } from "../utils/sessionAttribution.js";
 import { processResults } from "../utils/utils.js";
 
 interface UserPageviewData {
@@ -73,8 +74,8 @@ export async function getUserInfo(
             argMax(operating_system_version, timestamp) AS operating_system_version,
             argMax(screen_width, timestamp) AS screen_width,
             argMax(screen_height, timestamp) AS screen_height,
-            argMin(referrer, timestamp) AS referrer,
-            argMin(channel, timestamp) AS channel,
+            ${SESSION_REFERRER_AGG} AS referrer,
+            ${SESSION_CHANNEL_AGG} AS channel,
             MAX(timestamp) AS session_end,
             MIN(timestamp) AS session_start,
             dateDiff('second', MIN(timestamp), MAX(timestamp)) AS session_duration,

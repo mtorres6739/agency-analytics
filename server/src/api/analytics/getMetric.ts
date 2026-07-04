@@ -3,6 +3,7 @@ import { clickhouse } from "../../db/clickhouse/clickhouse.js";
 import { FilterParameter } from "./types.js";
 import { getTimeStatement, processResults } from "./utils/utils.js";
 import { getFilterStatement, getSqlParam } from "./utils/getFilterStatement.js";
+import { SESSION_CHANNEL_AGG } from "./utils/sessionAttribution.js";
 import { FilterParams } from "@rybbit/shared";
 
 interface GetMetricRequest {
@@ -353,12 +354,16 @@ const getQuery = (request: FastifyRequest<GetMetricRequest>, isCountQuery: boole
   // Default case for other parameters
   const sqlParam = getSqlParam(parameter);
 
+  // Sessions are attributed to their first attributed channel (matching the
+  // sessions views), not the first event's channel, which is often 'Direct'.
+  const valueExpression = parameter === "channel" ? SESSION_CHANNEL_AGG : `argMin(${sqlParam}, e.timestamp)`;
+
   if (isCountQuery) {
     return `
     SELECT COUNT(DISTINCT value) as totalCount
     FROM (
         SELECT
-            argMin(${sqlParam}, e.timestamp) as value
+            ${valueExpression} as value
         FROM events e
         WHERE
             e.site_id = {siteId:Int32}
@@ -385,7 +390,7 @@ const getQuery = (request: FastifyRequest<GetMetricRequest>, isCountQuery: boole
     ),
     SessionData AS (
         SELECT
-            argMin(${sqlParam}, e.timestamp) as value,
+            ${valueExpression} as value,
             e.session_id,
             any(spc.pageviews_in_session) as pageviews_in_session
         FROM events e

@@ -5,6 +5,7 @@ import { db } from "../../../db/postgres/postgres.js";
 import { enrichWithTraits, getTimeStatement, processResults } from "../utils/utils.js";
 import { FilterParams } from "@rybbit/shared";
 import { getFilterStatement } from "../utils/getFilterStatement.js";
+import { SESSION_CHANNEL_AGG, SESSION_REFERRER_AGG } from "../utils/sessionAttribution.js";
 
 export type GetUsersResponse = {
   user_id: string; // Device fingerprint
@@ -118,8 +119,8 @@ WITH AggregatedUsers AS (
         argMax(device_type, timestamp) AS device_type,
         argMax(screen_width, timestamp) AS screen_width,
         argMax(screen_height, timestamp) AS screen_height,
-        argMin(referrer, timestamp) AS referrer,
-        argMin(channel, timestamp) AS channel,
+        ${SESSION_REFERRER_AGG} AS referrer,
+        ${SESSION_CHANNEL_AGG} AS channel,
         argMin(hostname, timestamp) AS hostname,
         countIf(type = 'pageview') AS pageviews,
         countIf(type = 'custom_event') AS events,

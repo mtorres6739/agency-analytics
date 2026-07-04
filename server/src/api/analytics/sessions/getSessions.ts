@@ -2,6 +2,7 @@ import { FilterParams } from "@rybbit/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { clickhouse } from "../../../db/clickhouse/clickhouse.js";
 import { getFilterStatement } from "../utils/getFilterStatement.js";
+import { SESSION_CHANNEL_AGG, SESSION_REFERRER_AGG } from "../utils/sessionAttribution.js";
 import { enrichWithTraits, getTimeStatement, processResults } from "../utils/utils.js";
 
 export type GetSessionsResponse = {
@@ -120,8 +121,8 @@ export async function getSessions(req: FastifyRequest<GetSessionsRequest>, res: 
           argMax(operating_system_version, timestamp) AS operating_system_version,
           argMax(screen_width, timestamp) AS screen_width,
           argMax(screen_height, timestamp) AS screen_height,
-          argMin(referrer, timestamp) AS referrer,
-          argMin(channel, timestamp) AS channel,
+          ${SESSION_REFERRER_AGG} AS referrer,
+          ${SESSION_CHANNEL_AGG} AS channel,
           argMin(hostname, timestamp) AS hostname,
           argMin(url_parameters, timestamp)['utm_source'] AS utm_source,
           argMin(url_parameters, timestamp)['utm_medium'] AS utm_medium,
