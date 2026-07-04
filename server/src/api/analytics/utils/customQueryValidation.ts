@@ -77,6 +77,54 @@ const blockedFunctions = [
   "viewIfPermitted",
 ] as const;
 
+const quotedIdentifierError = "Quoted identifiers are not allowed in custom analytics queries";
+
+function hasQuotedIdentifierSyntax(query: string) {
+  let index = 0;
+  let state: "normal" | "single" | "line-comment" | "block-comment" = "normal";
+
+  while (index < query.length) {
+    const char = query[index];
+    const next = query[index + 1];
+
+    if (state === "normal") {
+      if (char === '"' || char === "`") {
+        return true;
+      }
+      if (char === "'") {
+        state = "single";
+      } else if (char === "-" && next === "-") {
+        state = "line-comment";
+        index++;
+      } else if (char === "/" && next === "*") {
+        state = "block-comment";
+        index++;
+      }
+    } else if (state === "single") {
+      if (char === "\\" && next !== undefined) {
+        index++;
+      } else if (char === "'" && next === "'") {
+        index++;
+      } else if (char === "'") {
+        state = "normal";
+      }
+    } else if (state === "line-comment") {
+      if (char === "\n") {
+        state = "normal";
+      }
+    } else if (state === "block-comment") {
+      if (char === "*" && next === "/") {
+        state = "normal";
+        index++;
+      }
+    }
+
+    index++;
+  }
+
+  return false;
+}
+
 function stripSqlLiteralsAndComments(query: string) {
   let result = "";
   let index = 0;
@@ -90,7 +138,7 @@ function stripSqlLiteralsAndComments(query: string) {
       if (char === "'") {
         state = "single";
         result += " ";
-      } else if (char === "\"") {
+      } else if (char === '"') {
         state = "double";
         result += " ";
       } else if (char === "`") {
@@ -124,7 +172,7 @@ function stripSqlLiteralsAndComments(query: string) {
       if (char === "\\" && next !== undefined) {
         result += "  ";
         index++;
-      } else if (char === "\"") {
+      } else if (char === '"') {
         state = "normal";
         result += " ";
       } else {
@@ -282,6 +330,14 @@ function collectTableReferences(query: string): string[] {
 
 export function validateScopedQuery(query: string): string | null {
   const normalizedQuery = normalizeCustomQuery(query);
+
+  // ClickHouse treats double quotes and backticks as identifier quoting, not
+  // string literals. Allowing them lets a quoted table name disappear before the
+  // validator scans FROM/JOIN targets.
+  if (hasQuotedIdentifierSyntax(normalizedQuery)) {
+    return quotedIdentifierError;
+  }
+
   const queryWithoutLiterals = stripSqlLiteralsAndComments(normalizedQuery);
   const compactQuery = queryWithoutLiterals.trim();
   const cteNames = getCteNames(compactQuery);

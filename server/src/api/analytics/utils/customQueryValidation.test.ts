@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { validateScopedQuery } from "./customQueryValidation.js";
 
 const SCOPED_ONLY_ERROR = "Queries can only read from scoped_events";
+const QUOTED_IDENTIFIER_ERROR = "Quoted identifiers are not allowed in custom analytics queries";
 
 describe("validateScopedQuery — table reference scoping", () => {
   it("allows reading from scoped_events", () => {
@@ -10,14 +11,10 @@ describe("validateScopedQuery — table reference scoping", () => {
 
   it("allows CTEs and self-joins on scoped_events", () => {
     expect(
-      validateScopedQuery(
-        "WITH t AS (SELECT user_id, count() c FROM scoped_events GROUP BY user_id) SELECT * FROM t"
-      )
+      validateScopedQuery("WITH t AS (SELECT user_id, count() c FROM scoped_events GROUP BY user_id) SELECT * FROM t")
     ).toBeNull();
     expect(
-      validateScopedQuery(
-        "SELECT a.user_id FROM scoped_events a JOIN scoped_events b ON a.user_id = b.user_id"
-      )
+      validateScopedQuery("SELECT a.user_id FROM scoped_events a JOIN scoped_events b ON a.user_id = b.user_id")
     ).toBeNull();
   });
 
@@ -43,24 +40,28 @@ describe("validateScopedQuery — table reference scoping", () => {
   });
 
   it("blocks comma-join without surrounding whitespace", () => {
-    expect(
-      validateScopedQuery("SELECT * FROM scoped_events,sessions_mv_target LIMIT 1")
-    ).toBe(SCOPED_ONLY_ERROR);
+    expect(validateScopedQuery("SELECT * FROM scoped_events,sessions_mv_target LIMIT 1")).toBe(SCOPED_ONLY_ERROR);
   });
 
   it("blocks an unauthorized table inside a subquery comma-join", () => {
-    expect(
-      validateScopedQuery(
-        "SELECT * FROM (SELECT * FROM scoped_events, sessions_mv_target) x LIMIT 1"
-      )
-    ).toBe(SCOPED_ONLY_ERROR);
+    expect(validateScopedQuery("SELECT * FROM (SELECT * FROM scoped_events, sessions_mv_target) x LIMIT 1")).toBe(
+      SCOPED_ONLY_ERROR
+    );
   });
 
   it("still blocks plain FROM/JOIN to unauthorized tables", () => {
     expect(validateScopedQuery("SELECT * FROM events")).toBe(SCOPED_ONLY_ERROR);
-    expect(
-      validateScopedQuery("SELECT * FROM scoped_events JOIN events ON 1=1")
-    ).toBe(SCOPED_ONLY_ERROR);
+    expect(validateScopedQuery("SELECT * FROM scoped_events JOIN events ON 1=1")).toBe(SCOPED_ONLY_ERROR);
+  });
+
+  it("blocks quoted identifiers that can hide unauthorized table references", () => {
+    expect(validateScopedQuery('SELECT * FROM "events" scoped_events WHERE 1=1')).toBe(QUOTED_IDENTIFIER_ERROR);
+    expect(validateScopedQuery("SELECT * FROM `events` scoped_events WHERE 1=1")).toBe(QUOTED_IDENTIFIER_ERROR);
+    expect(validateScopedQuery('SELECT * FROM "scoped_events" WHERE 1=1')).toBe(QUOTED_IDENTIFIER_ERROR);
+  });
+
+  it("allows double quotes and backticks inside string literals", () => {
+    expect(validateScopedQuery("SELECT 'quoted \"text\" and `ticks`' AS label FROM scoped_events")).toBeNull();
   });
 
   it("requires the query to reference scoped_events at all", () => {
