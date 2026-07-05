@@ -5,10 +5,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Menu } from "lucide-react";
 import { useExtracted } from "next-intl";
+import { notFound } from "next/navigation";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { AppSidebar } from "../../components/AppSidebar";
 import { Button } from "../../components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { DEPLOYMENT, IS_CLOUD } from "../../lib/const";
 import { Database } from "./components/database/Database";
 import { Organizations } from "./components/organizations/Organizations";
 import { AdminLayout } from "./components/shared/AdminLayout";
@@ -42,6 +44,8 @@ function MobileSidebar() {
 }
 
 export default function AdminPage() {
+  if (!IS_CLOUD && !DEPLOYMENT) notFound();
+
   const [activeTab, setActiveTab] = useQueryState(
     "tab",
     parseAsStringLiteral(ADMIN_TABS).withDefault("organizations")
