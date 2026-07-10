@@ -40,7 +40,8 @@ export function useGetGSCData(dimension: GSCDimension) {
         dimension,
         startDate,
         endDate,
-        timeZone: timezone,
+        // Resolve the "system" sentinel — the API needs a real IANA zone
+        timeZone: getTimezone(),
       });
     },
     enabled: !!site,
