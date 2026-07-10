@@ -120,6 +120,7 @@ import {
   getSiteHasData,
   getSiteImports,
   getSiteIsPublic,
+  getSiteUsage,
   getSitePrivateLinkConfig,
   getSitesFromOrg,
   getTrackingConfig,
@@ -378,6 +379,9 @@ async function sitesRoutes(fastify: FastifyInstance) {
   fastify.get("/sites/:siteId/excluded-paths", authSite, getSiteExcludedPaths);
   fastify.get("/sites/:siteId/excluded-hostnames", authSite, getSiteExcludedHostnames);
   fastify.get("/sites/:siteId/excluded-user-agents", authSite, getSiteExcludedUserAgents);
+
+  // Site Usage
+  fastify.get("/sites/:siteId/usage", authSite, getSiteUsage);
 
   // Site Imports
   fastify.get("/sites/:siteId/imports", adminSite, getSiteImports);

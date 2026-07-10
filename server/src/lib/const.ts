@@ -16,6 +16,19 @@ export const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN;
 
 export const DEFAULT_EVENT_LIMIT = 3_000;
 
+// Event types that count toward an organization's monthly usage limit.
+// Keep in sync with billing/usage docs; used by the usage cron and per-site usage endpoint.
+export const USAGE_COUNTED_EVENT_TYPES = [
+  "pageview",
+  "custom_event",
+  "performance",
+  "outbound",
+  "button_click",
+  "copy",
+  "form_submit",
+  "input_change",
+] as const;
+
 // Site and member limits per plan tier
 export const FREE_SITE_LIMIT = 1;
 export const FREE_MEMBER_LIMIT = 1;

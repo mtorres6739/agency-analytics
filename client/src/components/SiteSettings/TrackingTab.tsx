@@ -4,7 +4,6 @@ import { useExtracted } from "next-intl";
 import { useState, useCallback, ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 import { updateSiteConfig, SiteResponse } from "@/api/admin/endpoints";
@@ -13,6 +12,8 @@ import { planIncludesReplay } from "@/lib/subscription/planUtils";
 import { useStripeSubscription } from "@/lib/subscription/useStripeSubscription";
 import { Badge } from "@/components/ui/badge";
 import { IS_CLOUD } from "@/lib/const";
+
+import { SettingRow, SettingsSection, SettingsSections } from "./SettingsSection";
 
 interface TrackingTabProps {
   siteMetadata: SiteResponse;
@@ -226,16 +227,15 @@ export function TrackingTab({ siteMetadata, disabled = false }: TrackingTabProps
   ];
 
   const renderToggleSection = (toggles: ToggleConfig[], title: string) => (
-    <div className="space-y-4">
-      <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+    <SettingsSection title={title}>
       {toggles.map(toggle => (
-        <div key={toggle.id} className="flex items-center justify-between">
-          <div>
-            <Label htmlFor={toggle.id} className="text-sm font-medium text-foreground flex items-center gap-2">
-              {toggle.label} {toggle.badge && IS_CLOUD && toggle.badge}
-            </Label>
-            <p className="text-xs text-muted-foreground mt-1">{toggle.description}</p>
-          </div>
+        <SettingRow
+          key={toggle.id}
+          label={toggle.label}
+          htmlFor={toggle.id}
+          description={toggle.description}
+          badge={IS_CLOUD ? toggle.badge : undefined}
+        >
           <Switch
             id={toggle.id}
             checked={toggle.value}
@@ -250,15 +250,15 @@ export function TrackingTab({ siteMetadata, disabled = false }: TrackingTabProps
               )
             }
           />
-        </div>
+        </SettingRow>
       ))}
-    </div>
+    </SettingsSection>
   );
 
   return (
-    <div className="space-y-6">
+    <SettingsSections>
       {renderToggleSection(analyticsToggles, t("Analytics Features"))}
       {renderToggleSection(autoCaptureToggles, t("Auto Capture"))}
-    </div>
+    </SettingsSections>
   );
 }

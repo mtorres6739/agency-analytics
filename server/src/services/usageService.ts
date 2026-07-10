@@ -6,7 +6,7 @@ import { processResults } from "../api/analytics/utils/utils.js";
 import { clickhouse } from "../db/clickhouse/clickhouse.js";
 import { db } from "../db/postgres/postgres.js";
 import { member, organization, sites, user } from "../db/postgres/schema.js";
-import { IS_CLOUD } from "../lib/const.js";
+import { IS_CLOUD, USAGE_COUNTED_EVENT_TYPES } from "../lib/const.js";
 import { sendApproachingLimitEmail, sendLimitExceededEmail } from "../lib/email/email.js";
 import { createServiceLogger } from "../lib/logger/logger.js";
 import {
@@ -198,13 +198,14 @@ class UsageService {
             site_id,
             COUNT(*) as count
           FROM events
-          WHERE type IN ('pageview', 'custom_event', 'performance', 'outbound', 'button_click', 'copy', 'form_submit', 'input_change')
+          WHERE type IN {types:Array(String)}
             AND timestamp >= toDate({periodStart:String})
           GROUP BY site_id
         `,
         format: "JSONEachRow",
         query_params: {
           periodStart: periodStart,
+          types: [...USAGE_COUNTED_EVENT_TYPES],
         },
       });
 

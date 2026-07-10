@@ -21,19 +21,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
 import { deleteSite, moveSite, updateSiteConfig, SiteResponse } from "@/api/admin/endpoints";
 import { useUserOrganizations } from "@/api/admin/hooks/useOrganizations";
 import { useGetSitesFromOrg } from "@/api/admin/hooks/useSites";
 import { normalizeDomain } from "@/lib/utils";
+
+import { SettingRow, SettingsSection, SettingsSections } from "./SettingsSection";
 
 interface GeneralTabProps {
   siteMetadata: SiteResponse;
@@ -236,60 +232,62 @@ export function GeneralTab({ siteMetadata, disabled = false, onClose, onPublicCh
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <div>
-          <h4 className="text-sm font-semibold text-foreground">{t("Site Name")}</h4>
-          <p className="text-xs text-muted-foreground">{t("The display name for this site")}</p>
+    <SettingsSections>
+      <SettingsSection>
+        <div className="space-y-2">
+          <div>
+            <Label htmlFor="site-name" className="text-sm font-medium text-foreground">
+              {t("Site Name")}
+            </Label>
+            <p className="mt-1 text-xs text-muted-foreground">{t("The display name for this site")}</p>
+          </div>
+          <div className="flex gap-2">
+            <Input id="site-name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="My Website" />
+            <Button
+              variant="outline"
+              onClick={handleNameChange}
+              disabled={isChangingName || newName === siteMetadata.name || disabled}
+            >
+              {isChangingName ? t("Updating...") : t("Update")}
+            </Button>
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="My Website" />
-          <Button
-            variant="outline"
-            onClick={handleNameChange}
-            disabled={isChangingName || newName === siteMetadata.name || disabled}
-          >
-            {isChangingName ? t("Updating...") : t("Update")}
-          </Button>
-        </div>
-      </div>
 
-      <div className="space-y-3">
-        <div>
-          <h4 className="text-sm font-semibold text-foreground">{identifierLabel}</h4>
-          <p className="text-xs text-muted-foreground">
-            {isMobileSite ? t("The bundle or package identifier used for tracking") : t("The domain used for tracking")}
-          </p>
+        <div className="space-y-2">
+          <div>
+            <Label htmlFor="site-domain" className="text-sm font-medium text-foreground">
+              {identifierLabel}
+            </Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isMobileSite
+                ? t("The bundle or package identifier used for tracking")
+                : t("The domain used for tracking")}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              id="site-domain"
+              value={newDomain}
+              onChange={e => {
+                const value = e.target.value.trim();
+                setNewDomain(isMobileSite ? value : value.toLowerCase());
+              }}
+              placeholder={isMobileSite ? "com.example.app" : "example.com"}
+            />
+            <Button
+              variant="outline"
+              onClick={handleDomainChange}
+              disabled={isChangingDomain || newDomain === siteMetadata.domain || disabled}
+            >
+              {isChangingDomain ? t("Updating...") : t("Update")}
+            </Button>
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <Input
-            value={newDomain}
-            onChange={e => {
-              const value = e.target.value.trim();
-              setNewDomain(isMobileSite ? value : value.toLowerCase());
-            }}
-            placeholder={isMobileSite ? "com.example.app" : "example.com"}
-          />
-          <Button
-            variant="outline"
-            onClick={handleDomainChange}
-            disabled={isChangingDomain || newDomain === siteMetadata.domain || disabled}
-          >
-            {isChangingDomain ? t("Updating...") : t("Update")}
-          </Button>
-        </div>
-      </div>
+      </SettingsSection>
 
-      <div className="space-y-4">
-        <h4 className="text-sm font-semibold text-foreground">{t("Privacy & Security")}</h4>
+      <SettingsSection title={t("Privacy & Security")}>
         {privacyToggles.map(toggle => (
-          <div key={toggle.id} className="flex items-center justify-between">
-            <div>
-              <Label htmlFor={toggle.id} className="text-sm font-medium text-foreground flex items-center gap-2">
-                {toggle.label}
-              </Label>
-              <p className="text-xs text-muted-foreground mt-1">{toggle.description}</p>
-            </div>
+          <SettingRow key={toggle.id} label={toggle.label} htmlFor={toggle.id} description={toggle.description}>
             <Switch
               id={toggle.id}
               checked={toggle.value}
@@ -304,21 +302,18 @@ export function GeneralTab({ siteMetadata, disabled = false, onClose, onPublicCh
                 )
               }
             />
-          </div>
+          </SettingRow>
         ))}
-      </div>
+      </SettingsSection>
 
       {!disabled && moveTargets.length > 0 && (
-        <div className="space-y-3">
-          <div>
-            <h4 className="text-sm font-semibold text-foreground">{t("Move to Organization")}</h4>
-            <p className="text-xs text-muted-foreground">
-              {t(
-                "Transfer this site to another organization you administer. Team and restricted member access for this site will be reset."
-              )}
-            </p>
-          </div>
-          <div className="flex space-x-2">
+        <SettingsSection
+          title={t("Move to Organization")}
+          description={t(
+            "Transfer this site to another organization you administer. Team and restricted member access for this site will be reset."
+          )}
+        >
+          <div className="flex gap-2">
             <Select value={targetOrgId} onValueChange={setTargetOrgId}>
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder={t("Select an organization")} />
@@ -359,37 +354,44 @@ export function GeneralTab({ siteMetadata, disabled = false, onClose, onPublicCh
               </AlertDialogContent>
             </AlertDialog>
           </div>
-        </div>
+        </SettingsSection>
       )}
 
-      <div className="space-y-3 pt-3">
-        <h4 className="text-sm font-semibold text-destructive">{t("Danger Zone")}</h4>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" disabled={disabled}>
-              <AlertTriangle className="h-4 w-4" />
-              {t("Delete Site")}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t("Are you absolutely sure?")}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t(
-                  'This action cannot be undone. This will permanently delete the site "{siteName}" and all of its analytics data.',
-                  { siteName: siteMetadata.name }
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} disabled={isDeleting} variant="destructive">
-                {isDeleting ? t("Deleting...") : t("Yes, delete site")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </div>
+      <SettingsSection>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 px-4 py-3 dark:border-red-500/25">
+          <div>
+            <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">{t("Danger Zone")}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("Permanently delete this site and all of its analytics data.")}
+            </p>
+          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={disabled}>
+                <AlertTriangle className="h-4 w-4" />
+                {t("Delete Site")}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t("Are you absolutely sure?")}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t(
+                    'This action cannot be undone. This will permanently delete the site "{siteName}" and all of its analytics data.',
+                    { siteName: siteMetadata.name }
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={isDeleting} variant="destructive">
+                  {isDeleting ? t("Deleting...") : t("Yes, delete site")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </SettingsSection>
+    </SettingsSections>
   );
 }

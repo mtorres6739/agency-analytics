@@ -4,6 +4,7 @@ import {
   Ban,
   Code,
   Download,
+  Gauge,
   LayoutDashboard,
   LayoutTemplate,
   Plug,
@@ -28,6 +29,7 @@ import { ExclusionsTab } from "./ExclusionsTab";
 import { IntegrationsTab } from "./IntegrationsTab";
 import { EmbedTab } from "./EmbedTab";
 import { DashboardEmbedTab } from "./DashboardEmbedTab";
+import { UsageTab } from "./UsageTab";
 import { useGetSite } from "../../api/admin/hooks/useSites";
 import { useUserOrganizations } from "../../api/admin/hooks/useOrganizations";
 import { useGetSitesFromOrg } from "../../api/admin/hooks/useSites";
@@ -52,7 +54,8 @@ type TabKey =
   | "script"
   | "import"
   | "widget-embeds"
-  | "dashboard-embed";
+  | "dashboard-embed"
+  | "usage";
 
 function SiteSettingsInner({ siteMetadata, trigger }: { siteMetadata: SiteResponse; trigger?: React.ReactNode }) {
   const t = useExtracted();
@@ -106,6 +109,7 @@ function SiteSettingsInner({ siteMetadata, trigger }: { siteMetadata: SiteRespon
     { key: "widget-embeds", label: t("Widget Embeds"), icon: LayoutTemplate },
     { key: "dashboard-embed", label: t("Dashboard Embed"), icon: LayoutDashboard },
     { key: "import", label: t("Import"), icon: Download },
+    { key: "usage", label: t("Usage"), icon: Gauge },
   ];
 
   const visibleTabs = tabs.filter(t => !t.hidden);
@@ -189,12 +193,10 @@ function SiteSettingsInner({ siteMetadata, trigger }: { siteMetadata: SiteRespon
                 <EmbedTab siteMetadata={currentSiteMetadata} embedEnabled={embedEnabled} />
               )}
               {activeTab === "dashboard-embed" && (
-                <DashboardEmbedTab
-                  siteMetadata={currentSiteMetadata}
-                  disabled={disabled}
-                />
+                <DashboardEmbedTab siteMetadata={currentSiteMetadata} disabled={disabled} />
               )}
               {activeTab === "import" && <ImportManager siteId={siteMetadata.siteId} disabled={disabled} />}
+              {activeTab === "usage" && <UsageTab siteId={siteMetadata.siteId} />}
             </div>
           </main>
         </div>

@@ -8,8 +8,9 @@ export {
   fetchSitesFromOrg,
   fetchSiteHasData,
   fetchSiteIsPublic,
+  fetchSiteUsage,
 } from "./sites";
-export type { SiteResponse, GetSitesFromOrgResponse } from "./sites";
+export type { SiteResponse, GetSitesFromOrgResponse, SiteUsageResponse } from "./sites";
 
 // Organizations endpoints
 export {
