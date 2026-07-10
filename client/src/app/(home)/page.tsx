@@ -4,27 +4,27 @@ import { useWindowSize } from "@uidotdev/usehooks";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useExtracted } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
-import { useUserOrganizations } from "../api/admin/hooks/useOrganizations";
-import { useGetSitesFromOrg } from "../api/admin/hooks/useSites";
-import { useTeams } from "../api/admin/hooks/useTeams";
-import { AppSidebar } from "../components/AppSidebar";
-import { CreateOrganizationDialog } from "../components/CreateOrganizationDialog";
-import { DateSelector } from "../components/DateSelector/DateSelector";
-import { NoOrganization } from "../components/NoOrganization";
-import { OrganizationSelector } from "../components/OrganizationSelector";
-import { NavigationSidebar } from "../components/sidebar/NavigationSidebar";
-import { SiteCard } from "../components/SiteCard";
-import { StandardPage } from "../components/StandardPage";
-import { TeamSelector } from "../components/TeamSelector";
-import { Button } from "../components/ui/button";
-import { Card, CardDescription, CardTitle } from "../components/ui/card";
-import { Input } from "../components/ui/input";
-import { MultiSelect } from "../components/ui/multi-select";
-import { Pagination } from "../components/pagination";
-import { useSetPageTitle } from "../hooks/useSetPageTitle";
-import { authClient } from "../lib/auth";
-import { canGoForward, goBack, goForward, useStore } from "../lib/store";
-import { AddSite } from "./components/AddSite";
+import { useUserOrganizations } from "../../api/admin/hooks/useOrganizations";
+import { useGetSitesFromOrg } from "../../api/admin/hooks/useSites";
+import { useTeams } from "../../api/admin/hooks/useTeams";
+import { AppSidebar } from "../../components/AppSidebar";
+import { CreateOrganizationDialog } from "../../components/CreateOrganizationDialog";
+import { DateSelector } from "../../components/DateSelector/DateSelector";
+import { NoOrganization } from "../../components/NoOrganization";
+import { OrganizationSelector } from "../../components/OrganizationSelector";
+import { NavigationSidebar } from "../../components/sidebar/NavigationSidebar";
+import { StandardPage } from "../../components/StandardPage";
+import { TeamSelector } from "../../components/TeamSelector";
+import { Button } from "../../components/ui/button";
+import { Card, CardDescription, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { MultiSelect } from "../../components/ui/multi-select";
+import { Pagination } from "../../components/pagination";
+import { useSetPageTitle } from "../../hooks/useSetPageTitle";
+import { authClient } from "../../lib/auth";
+import { canGoForward, goBack, goForward, useStore } from "../../lib/store";
+import { AddSite } from "../components/AddSite";
+import { SiteCard } from "./SiteCard";
 
 // Only render a bounded slice of site cards at a time. Each card mounts an
 // IntersectionObserver and fires its own analytics queries, so rendering every
@@ -39,14 +39,9 @@ export default function Home() {
   const isDesktop = width !== null && width >= 768;
 
   const { time, setTime } = useStore();
-  const { data: activeOrganization, isPending } =
-    authClient.useActiveOrganization();
+  const { data: activeOrganization, isPending } = authClient.useActiveOrganization();
 
-  const {
-    data: sites,
-    refetch: refetchSites,
-    isLoading: isLoadingSites,
-  } = useGetSitesFromOrg(activeOrganization?.id);
+  const { data: sites, refetch: refetchSites, isLoading: isLoadingSites } = useGetSitesFromOrg(activeOrganization?.id);
 
   const {
     data: userOrganizationsData,
@@ -58,22 +53,18 @@ export default function Home() {
   const isLoading = isLoadingOrganizations || isPending || isLoadingSites;
 
   // Check if user has organizations
-  const hasOrganizations =
-    Array.isArray(userOrganizationsData) && userOrganizationsData.length > 0;
+  const hasOrganizations = Array.isArray(userOrganizationsData) && userOrganizationsData.length > 0;
   const hasNoOrganizations = !isLoading && !hasOrganizations;
 
   // Check user permissions for the active organization
-  const activeOrgMembership = userOrganizationsData?.find(
-    (org) => org.id === activeOrganization?.id
-  );
+  const activeOrgMembership = userOrganizationsData?.find(org => org.id === activeOrganization?.id);
 
   const isUserMember = activeOrgMembership?.role === "member";
   const canAddSites = hasOrganizations && !isUserMember;
 
   // Check if we should show sites content
   const shouldShowSites = hasOrganizations && !isLoading;
-  const hasNoSites =
-    shouldShowSites && (!sites?.sites || sites.sites.length === 0);
+  const hasNoSites = shouldShowSites && (!sites?.sites || sites.sites.length === 0);
 
   const { data: teamsData } = useTeams(activeOrganization?.id);
 
@@ -91,7 +82,7 @@ export default function Home() {
 
   // Compute unique tags from all sites
   const allTags = useMemo(() => {
-    const tags = sites?.sites?.flatMap((s) => s.tags || []) || [];
+    const tags = sites?.sites?.flatMap(s => s.tags || []) || [];
     return Array.from(new Set(tags)).toSorted();
   }, [sites?.sites]);
 
@@ -102,19 +93,14 @@ export default function Home() {
   const teams = teamsData?.teams || [];
 
   // Filter sites by name, tags, and team
-  const filteredSites = sites?.sites?.filter((site) => {
-    const matchesDomain = site.name
-      .toLowerCase()
-      .includes(nameFilter.toLowerCase());
-    const matchesTags =
-      selectedTags.length === 0 ||
-      selectedTags.some((tag) => site.tags?.includes(tag));
+  const filteredSites = sites?.sites?.filter(site => {
+    const matchesDomain = site.name.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => site.tags?.includes(tag));
     let matchesTeam = true;
     if (selectedTeamFilter === "unassigned") {
       matchesTeam = !site.teams || site.teams.length === 0;
     } else if (selectedTeamFilter !== "all") {
-      matchesTeam =
-        site.teams?.some((t) => t.id === selectedTeamFilter) || false;
+      matchesTeam = site.teams?.some(t => t.id === selectedTeamFilter) || false;
     }
     return matchesDomain && matchesTags && matchesTeam;
   });
@@ -124,10 +110,7 @@ export default function Home() {
   const totalFiltered = filteredSites?.length ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paginatedSites = filteredSites?.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
-  );
+  const paginatedSites = filteredSites?.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const hasNoMatches = totalFiltered === 0;
 
   // Handle successful organization creation
@@ -138,9 +121,7 @@ export default function Home() {
 
   // Handle tag click to toggle filter
   const handleTagClick = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
+    setSelectedTags(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
   };
 
   const hasSites = shouldShowSites && sites?.sites && sites.sites.length > 0;
@@ -187,7 +168,7 @@ export default function Home() {
         <Input
           placeholder={t("Filter by name...")}
           value={nameFilter}
-          onChange={(e) => setNameFilter(e.target.value)}
+          onChange={e => setNameFilter(e.target.value)}
           className="pl-9"
         />
       </div>
@@ -195,7 +176,7 @@ export default function Home() {
       {allTags.length > 0 && (
         <div className="w-[200px]">
           <MultiSelect
-            options={allTags.map((tag) => ({ value: tag, label: tag }))}
+            options={allTags.map(tag => ({ value: tag, label: tag }))}
             value={selectedTags}
             onValueChange={setSelectedTags}
             placeholder={t("Filter by tags...")}
@@ -213,7 +194,7 @@ export default function Home() {
 
   const siteCards = (
     <div className="flex flex-col gap-2">
-      {paginatedSites?.map((site) => {
+      {paginatedSites?.map(site => {
         return (
           <SiteCard
             key={site.siteId}
@@ -230,22 +211,14 @@ export default function Home() {
       })}
       {hasSites && hasNoMatches ? (
         <Card className="p-6 flex flex-col items-center text-center">
-          <CardTitle className="mb-2 text-xl">
-            {t("No matching websites")}
-          </CardTitle>
-          <CardDescription>
-            {t("Try adjusting your filters")}
-          </CardDescription>
+          <CardTitle className="mb-2 text-xl">{t("No matching websites")}</CardTitle>
+          <CardDescription>{t("Try adjusting your filters")}</CardDescription>
         </Card>
       ) : null}
       {hasNoSites ? (
         <Card className="p-6 flex flex-col items-center text-center">
-          <CardTitle className="mb-2 text-xl">
-            {t("No websites yet")}
-          </CardTitle>
-          <CardDescription className="mb-4">
-            {t("Add your first website to start tracking analytics")}
-          </CardDescription>
+          <CardTitle className="mb-2 text-xl">{t("No websites yet")}</CardTitle>
+          <CardDescription className="mb-4">{t("Add your first website to start tracking analytics")}</CardDescription>
           <AddSite
             trigger={
               <Button variant="success" disabled={!canAddSites}>
