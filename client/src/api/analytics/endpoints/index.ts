@@ -25,6 +25,7 @@ export {
   fetchEventsCursor,
   fetchEventNames,
   fetchEventProperties,
+  fetchAutocaptureValues,
   fetchOutboundLinks,
   fetchSiteEventCount,
 } from "./events";
@@ -35,6 +36,7 @@ export type {
   CursorEventsResponse,
   EventName,
   EventProperty,
+  AutocaptureValue,
   OutboundLink,
   EventBucketedParams,
   EventPropertiesParams,
@@ -82,6 +84,8 @@ export type {
 export { fetchGoals, fetchGoalTimeSeries, fetchGoalSessions, createGoal, updateGoal, deleteGoal } from "./goals";
 export type {
   Goal,
+  GoalType,
+  GoalConfig,
   GoalTimeSeriesPoint,
   PaginationMeta,
   GoalsResponse,
@@ -127,10 +131,19 @@ export type {
 } from "./experiments";
 
 // Funnels endpoints
-export { fetchFunnels, analyzeFunnel, fetchFunnelStepSessions, saveFunnel, deleteFunnel } from "./funnels";
+export {
+  fetchFunnels,
+  analyzeFunnel,
+  fetchFunnelStepSessions,
+  saveFunnel,
+  deleteFunnel,
+  stepRequiresValue,
+  hasIncompleteSteps,
+} from "./funnels";
 export type {
   SavedFunnel,
   FunnelStep,
+  FunnelStepType,
   FunnelRequest,
   SaveFunnelRequest,
   FunnelResponse,

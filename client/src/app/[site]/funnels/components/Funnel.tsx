@@ -4,9 +4,10 @@ import { useExtracted } from "next-intl";
 import round from "lodash/round";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
-import { FunnelResponse, FunnelStep } from "../../../../api/analytics/endpoints";
+import { FunnelResponse, FunnelStep, FunnelStepType } from "../../../../api/analytics/endpoints";
 import { useGetFunnelStepSessions } from "../../../../api/analytics/hooks/funnels/useGetFunnelStepSessions";
-import { EventIcon, PageviewIcon } from "../../../../components/EventIcons";
+import { EventTypeIcon } from "../../../../components/EventIcons";
+import { targetTypeToEventType } from "../../../../lib/events";
 import { SessionsList } from "../../../../components/Sessions/SessionsList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { useStore } from "../../../../lib/store";
@@ -40,6 +41,16 @@ interface FunnelStepComponentProps {
 
 function FunnelStepComponent({ step, index, steps, chartData, firstStep, siteId }: FunnelStepComponentProps) {
   const t = useExtracted();
+
+  const stepTypeLabels: Record<FunnelStepType, string> = {
+    page: t("Page"),
+    event: t("Event"),
+    outbound: t("Outbound"),
+    button_click: t("Button"),
+    form_submit: t("Form"),
+    copy: t("Copy"),
+  };
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentTab, setCurrentTab] = useState<"reached" | "dropped">("reached");
   const [reachedPage, setReachedPage] = useState(1);
@@ -110,8 +121,8 @@ function FunnelStepComponent({ step, index, steps, chartData, firstStep, siteId 
           {step.stepNumber}
         </div>
         <div className="font-medium text-sm flex items-center gap-2 flex-1">
-          {steps[index]?.type === "page" ? <PageviewIcon /> : <EventIcon />}
-          {step.stepName}
+          <EventTypeIcon type={targetTypeToEventType(steps[index]?.type || "event")} />
+          {step.stepName || stepTypeLabels[steps[index]?.type || "event"]}
         </div>
         <div className="shrink-0">
           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 import { Reorder } from "framer-motion";
 import { ChevronDown, ChevronUp, GripVertical, Plus, Save, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { FunnelResponse, FunnelStep } from "../../../../api/analytics/endpoints";
+import { FunnelResponse, FunnelStep, FunnelStepType, hasIncompleteSteps } from "../../../../api/analytics/endpoints";
+import { useAutocaptureValuesByType } from "../../../../api/analytics/hooks/events/useAutocaptureValues";
 import { useMetric } from "../../../../api/analytics/hooks/useGetMetric";
 import { ThreeDotLoader } from "../../../../components/Loaders";
 import { Label } from "../../../../components/ui/label";
 import { Switch } from "../../../../components/ui/switch";
+import { isAutocaptureTargetType } from "../../../../lib/events";
 import { Funnel } from "./Funnel";
 
 const URL_PATTERN = /^(https?:\/\/|www\.|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}\/)/i;
@@ -50,6 +52,25 @@ export function FunnelForm({
   funnelData,
 }: FunnelFormProps) {
   const t = useExtracted();
+
+  const stepTypeLabels: Record<FunnelStepType, string> = {
+    page: t("Path"),
+    event: t("Event"),
+    outbound: t("Outbound"),
+    button_click: t("Button"),
+    form_submit: t("Form"),
+    copy: t("Copy"),
+  };
+
+  const stepValuePlaceholders: Record<FunnelStepType, string> = {
+    page: t("Path (e.g. /pricing)"),
+    event: t("Event name"),
+    outbound: t("URL pattern (optional)"),
+    button_click: t("Button text (optional)"),
+    form_submit: t("Form name or ID (optional)"),
+    copy: t("Copied text (optional)"),
+  };
+
   // State to track which event steps have property filtering enabled
   const [useProperties, setUseProperties] = useState<boolean[]>(() =>
     steps.map(
@@ -111,23 +132,41 @@ export function FunnelForm({
   });
 
   // Transform data into SuggestionOption format
-  const pathSuggestions: SuggestionOption[] =
-    pathsData?.data?.map(item => ({
-      value: item.value,
-      label: item.value,
-    })) || [];
+  const pathSuggestions: SuggestionOption[] = useMemo(
+    () => pathsData?.data?.map(item => ({ value: item.value, label: item.value })) || [],
+    [pathsData]
+  );
 
-  const eventSuggestions: SuggestionOption[] =
-    eventsData?.data?.map(item => ({
-      value: item.value,
-      label: item.value,
-    })) || [];
+  const eventSuggestions: SuggestionOption[] = useMemo(
+    () => eventsData?.data?.map(item => ({ value: item.value, label: item.value })) || [],
+    [eventsData]
+  );
 
-  const hostnameSuggestions: SuggestionOption[] =
-    hostnamesData?.data?.map(item => ({
-      value: item.value,
-      label: item.value,
-    })) || [];
+  const hostnameSuggestions: SuggestionOption[] = useMemo(
+    () => hostnamesData?.data?.map(item => ({ value: item.value, label: item.value })) || [],
+    [hostnamesData]
+  );
+
+  // Suggestions for autocapture step values, fetched only for types in use
+  const enabledAutocaptureTypes = useMemo(
+    () => new Set(steps.map(step => step.type).filter(isAutocaptureTargetType)),
+    [steps]
+  );
+  const autocaptureValuesByType = useAutocaptureValuesByType(enabledAutocaptureTypes);
+
+  const stepSuggestions: Record<FunnelStepType, SuggestionOption[]> = useMemo(() => {
+    const toSuggestions = (values?: { value: string }[]): SuggestionOption[] =>
+      values?.map(item => ({ value: item.value, label: item.value })) || [];
+
+    return {
+      page: pathSuggestions,
+      event: eventSuggestions,
+      outbound: toSuggestions(autocaptureValuesByType.outbound),
+      button_click: toSuggestions(autocaptureValuesByType.button_click),
+      form_submit: toSuggestions(autocaptureValuesByType.form_submit),
+      copy: toSuggestions(autocaptureValuesByType.copy),
+    };
+  }, [pathSuggestions, eventSuggestions, autocaptureValuesByType]);
 
   // Handle reordering steps via drag-and-drop
   const handleReorder = (newOrder: string[]) => {
@@ -184,13 +223,27 @@ export function FunnelForm({
   };
 
   // Handle step type changes
-  const updateStepType = (index: number, type: "page" | "event") => {
+  const updateStepType = (index: number, type: FunnelStepType) => {
+    // Property filters are interpreted differently per step type (URL params vs.
+    // event props), so clear them instead of silently reinterpreting them under
+    // the new type's semantics.
     const newSteps = [...steps];
     newSteps[index] = {
       ...newSteps[index],
       type,
+      eventPropertyKey: undefined,
+      eventPropertyValue: undefined,
+      propertyFilters: undefined,
     };
     setSteps(newSteps);
+
+    const newUseProperties = [...useProperties];
+    newUseProperties[index] = false;
+    setUseProperties(newUseProperties);
+
+    const newStepPropertyFilters = [...stepPropertyFilters];
+    newStepPropertyFilters[index] = [{ key: "", value: "" }];
+    setStepPropertyFilters(newStepPropertyFilters);
   };
 
   // Handle property filtering toggle
@@ -217,7 +270,7 @@ export function FunnelForm({
     funnelArea = <Funnel data={funnelData} isError={isError} error={error} isPending={isPending} steps={steps} />;
   }
 
-  if (steps.some(step => !step.value)) {
+  if (hasIncompleteSteps(steps)) {
     funnelArea = (
       <div className="flex items-center justify-center rounded-lg h-full">
         <div className="text-center p-6">
@@ -269,22 +322,22 @@ export function FunnelForm({
                       <div className="shrink-0 w-6 h-6 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center text-xs">
                         {index + 1}
                       </div>
-                      <Select
-                        value={step.type}
-                        onValueChange={value => updateStepType(index, value as "page" | "event")}
-                      >
-                        <SelectTrigger className="min-w-[80px] max-w-[80px] border-neutral-300 dark:border-neutral-700">
+                      <Select value={step.type} onValueChange={value => updateStepType(index, value as FunnelStepType)}>
+                        <SelectTrigger className="min-w-[105px] max-w-[105px] border-neutral-300 dark:border-neutral-700">
                           <SelectValue placeholder={t("Type")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="page">{t("Path")}</SelectItem>
-                          <SelectItem value="event">{t("Event")}</SelectItem>
+                          {(Object.keys(stepTypeLabels) as FunnelStepType[]).map(type => (
+                            <SelectItem key={type} value={type}>
+                              {stepTypeLabels[type]}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <div className="flex flex-col">
                         <InputWithSuggestions
-                          suggestions={step.type === "page" ? pathSuggestions : eventSuggestions}
-                          placeholder={step.type === "page" ? t("Path (e.g. /pricing)") : t("Event name")}
+                          suggestions={stepSuggestions[step.type]}
+                          placeholder={stepValuePlaceholders[step.type]}
                           value={step.value}
                           className={cn(
                             "border-neutral-300 dark:border-neutral-700 w-[260px]",
