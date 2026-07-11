@@ -488,7 +488,7 @@
   "rIc2Hm": "Zaktualizuj lejek",
   "m1czzY": "Zdarzenie",
   "KP63fg": "",
-  "baRFiF": "",
+  "baRFiF": "Formularz",
   "29V0Ci": "sesje",
   "lHFZhY": "{count} porzuciło",
   "zIaJNz": "Dotarło ({count})",
@@ -1603,5 +1603,14 @@
   "QOaR8l": "Przesłano formularz do \"{action}\"",
   "IQ5tZg": "Przesłano formularz",
   "+B+qvw": "Zmieniono {type}pole wprowadzania \"{name}\"",
-  "vDpLV2": "Zmieniono {type}pole wprowadzania"
+  "vDpLV2": "Zmieniono {type}pole wprowadzania",
+  "E2rh1p": "Przyciski",
+  "yGsZm0": "Formularze",
+  "y3qXTf": "Kopie",
+  "eHclX+": "Przesłania formularzy",
+  "d6avGo": "Przesłania",
+  "JaJoAk": "Tekst przycisku",
+  "UgH9Vn": "Skopiowany tekst",
+  "J+At6e": "Ostatnio przesłano",
+  "LovNd5": "Ostatnio skopiowano"
 }

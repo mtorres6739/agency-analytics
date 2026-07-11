@@ -488,7 +488,7 @@
   "rIc2Hm": "Actualizar embudo",
   "m1czzY": "Evento",
   "KP63fg": "",
-  "baRFiF": "",
+  "baRFiF": "Formulario",
   "29V0Ci": "sesiones",
   "lHFZhY": "{count} abandonados",
   "zIaJNz": "Alcanzados ({count})",
@@ -1603,5 +1603,14 @@
   "QOaR8l": "Formulario enviado a \"{action}\"",
   "IQ5tZg": "Formulario enviado",
   "+B+qvw": "{type}campo de entrada \"{name}\" cambiado",
-  "vDpLV2": "{type}campo de entrada cambiado"
+  "vDpLV2": "{type}campo de entrada cambiado",
+  "E2rh1p": "Botones",
+  "yGsZm0": "Formularios",
+  "y3qXTf": "Copias",
+  "eHclX+": "Envíos de Formularios",
+  "d6avGo": "Envíos",
+  "JaJoAk": "Texto del botón",
+  "UgH9Vn": "Texto copiado",
+  "J+At6e": "Último envío",
+  "LovNd5": "Última copia"
 }

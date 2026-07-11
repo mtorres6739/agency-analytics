@@ -488,7 +488,7 @@
   "rIc2Hm": "퍼널 업데이트",
   "m1czzY": "이벤트",
   "KP63fg": "",
-  "baRFiF": "",
+  "baRFiF": "양식",
   "29V0Ci": "세션",
   "lHFZhY": "{count}명 이탈",
   "zIaJNz": "도달 ({count})",
@@ -1603,5 +1603,14 @@
   "QOaR8l": "\"{action}\"에 양식 제출됨",
   "IQ5tZg": "양식 제출됨",
   "+B+qvw": "{type}입력 필드 \"{name}\" 변경됨",
-  "vDpLV2": "{type}입력 필드 변경됨"
+  "vDpLV2": "{type}입력 필드 변경됨",
+  "E2rh1p": "버튼",
+  "yGsZm0": "양식",
+  "y3qXTf": "복사",
+  "eHclX+": "양식 제출",
+  "d6avGo": "제출",
+  "JaJoAk": "버튼 텍스트",
+  "UgH9Vn": "복사된 텍스트",
+  "J+At6e": "마지막 제출",
+  "LovNd5": "마지막 복사"
 }

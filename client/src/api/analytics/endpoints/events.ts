@@ -73,6 +73,14 @@ export type OutboundLink = {
   lastClicked: string;
 };
 
+// Autocapture events (button clicks, form submissions, copies) grouped by
+// their display value
+export type AutocaptureEvent = {
+  value: string;
+  count: number;
+  lastOccurred: string;
+};
+
 // Event counts over time
 export type EventBucketedPoint = {
   time: string;
@@ -200,6 +208,27 @@ export async function fetchOutboundLinks(
   const response = await authedFetch<{ data: OutboundLink[] }>(
     `/sites/${site}/events/outbound`,
     toQueryParams(params)
+  );
+  return response.data;
+}
+
+/**
+ * Fetch autocapture events of a type (button clicks, form submissions,
+ * copies) grouped by display value, with counts and last occurrence
+ * GET /api/sites/:site/events/autocapture
+ */
+export async function fetchAutocaptureEvents(
+  site: string | number,
+  params: CommonApiParams & { type: string }
+): Promise<AutocaptureEvent[]> {
+  const queryParams = {
+    ...toQueryParams(params),
+    type: params.type,
+  };
+
+  const response = await authedFetch<{ data: AutocaptureEvent[] }>(
+    `/sites/${site}/events/autocapture`,
+    queryParams
   );
   return response.data;
 }

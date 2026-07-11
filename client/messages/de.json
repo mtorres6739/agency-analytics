@@ -488,7 +488,7 @@
   "rIc2Hm": "Trichter aktualisieren",
   "m1czzY": "Ereignis",
   "KP63fg": "",
-  "baRFiF": "",
+  "baRFiF": "Formular",
   "29V0Ci": "Sitzungen",
   "lHFZhY": "{count} abgebrochen",
   "zIaJNz": "Erreicht ({count})",
@@ -1603,5 +1603,14 @@
   "QOaR8l": "Formular an \"{action}\" gesendet",
   "IQ5tZg": "Formular abgesendet",
   "+B+qvw": "{type}eingabefeld \"{name}\" geändert",
-  "vDpLV2": "{type}eingabefeld geändert"
+  "vDpLV2": "{type}eingabefeld geändert",
+  "E2rh1p": "Buttons",
+  "yGsZm0": "Formulare",
+  "y3qXTf": "Kopien",
+  "eHclX+": "Formular-Übermittlungen",
+  "d6avGo": "Übermittlungen",
+  "JaJoAk": "Button-Text",
+  "UgH9Vn": "Kopierter Text",
+  "J+At6e": "Zuletzt übermittelt",
+  "LovNd5": "Zuletzt kopiert"
 }

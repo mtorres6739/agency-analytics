@@ -488,7 +488,7 @@
   "rIc2Hm": "Aggiorna Funnel",
   "m1czzY": "Evento",
   "KP63fg": "",
-  "baRFiF": "",
+  "baRFiF": "Modulo",
   "29V0Ci": "sessioni",
   "lHFZhY": "{count} abbandonati",
   "zIaJNz": "Raggiunti ({count})",
@@ -1603,5 +1603,14 @@
   "QOaR8l": "Modulo inviato a \"{action}\"",
   "IQ5tZg": "Modulo inviato",
   "+B+qvw": "{type}campo di input \"{name}\" modificato",
-  "vDpLV2": "{type}campo di input modificato"
+  "vDpLV2": "{type}campo di input modificato",
+  "E2rh1p": "Pulsanti",
+  "yGsZm0": "Moduli",
+  "y3qXTf": "Copie",
+  "eHclX+": "Invii dei Moduli",
+  "d6avGo": "Invii",
+  "JaJoAk": "Testo del Pulsante",
+  "UgH9Vn": "Testo Copiato",
+  "J+At6e": "Ultimo Invio",
+  "LovNd5": "Ultima Copia"
 }

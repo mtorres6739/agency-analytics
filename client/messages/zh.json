@@ -488,7 +488,7 @@
   "rIc2Hm": "更新漏斗",
   "m1czzY": "事件",
   "KP63fg": "",
-  "baRFiF": "",
+  "baRFiF": "表单",
   "29V0Ci": "个会话",
   "lHFZhY": "{count} 人流失",
   "zIaJNz": "已到达 ({count})",
@@ -1603,5 +1603,14 @@
   "QOaR8l": "已提交表单到 \"{action}\"",
   "IQ5tZg": "已提交表单",
   "+B+qvw": "已更改 {type}输入框 \"{name}\"",
-  "vDpLV2": "已更改 {type}输入框"
+  "vDpLV2": "已更改 {type}输入框",
+  "E2rh1p": "按钮",
+  "yGsZm0": "表单",
+  "y3qXTf": "复制次数",
+  "eHclX+": "表单提交",
+  "d6avGo": "提交次数",
+  "JaJoAk": "按钮文本",
+  "UgH9Vn": "复制的文本",
+  "J+At6e": "最后提交时间",
+  "LovNd5": "最后复制时间"
 }

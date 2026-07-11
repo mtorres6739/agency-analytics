@@ -1,4 +1,5 @@
 // Events
+export { getAutocaptureEvents } from "./events/getAutocaptureEvents.js";
 export { getAutocaptureValues } from "./events/getAutocaptureValues.js";
 export { getEventBucketed } from "./events/getEventBucketed.js";
 export { getEventNames } from "./events/getEventNames.js";

@@ -488,7 +488,7 @@
   "rIc2Hm": "Mettre à jour l'entonnoir",
   "m1czzY": "Événement",
   "KP63fg": "",
-  "baRFiF": "",
+  "baRFiF": "Formulaire",
   "29V0Ci": "Vues d'écran",
   "lHFZhY": "{count} abandonnées",
   "zIaJNz": "Atteint ({count})",
@@ -1603,5 +1603,14 @@
   "QOaR8l": "Formulaire soumis à \"{action}\"",
   "IQ5tZg": "Formulaire soumis",
   "+B+qvw": "{type}champ de saisie \"{name}\" modifié",
-  "vDpLV2": "{type}champ de saisie modifié"
+  "vDpLV2": "{type}champ de saisie modifié",
+  "E2rh1p": "Boutons",
+  "yGsZm0": "Formulaires",
+  "y3qXTf": "Copies",
+  "eHclX+": "Soumissions de formulaires",
+  "d6avGo": "Soumissions",
+  "JaJoAk": "Texte du bouton",
+  "UgH9Vn": "Texte copié",
+  "J+At6e": "Dernière soumission",
+  "LovNd5": "Dernière copie"
 }
