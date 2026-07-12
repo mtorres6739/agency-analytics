@@ -33,6 +33,7 @@ import { Skeleton } from "../../../../components/ui/skeleton";
 import { Avatar, generateName } from "../../../../components/Avatar";
 import { Badge } from "../../../../components/ui/badge";
 import { IdentifiedBadge } from "../../../../components/IdentifiedBadge";
+import { UserJourneys } from "./components/UserJourneys";
 import { UserTopPages } from "./components/UserTopPages";
 
 const LIMIT = 25;
@@ -189,6 +190,7 @@ export default function UserPage() {
         {/* Right Content - Sessions */}
         <div className="flex-1 min-w-0 space-y-4">
           <UserTopPages userId={userId} />
+          <UserJourneys userId={userId} />
           <SessionsList
             sessions={sessions}
             isLoading={isLoadingSessions}
