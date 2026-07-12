@@ -148,7 +148,7 @@ export function UsersTable() {
             <span className="max-w-32 truncate hover:underline" title={displayName}>
               {displayName}
             </span>
-            {isIdentified && <IdentifiedBadge traits={info.row.original.traits} />}
+            {isIdentified && <IdentifiedBadge traits={info.row.original.traits} userId={identifiedUserId} />}
           </Link>
         );
       },

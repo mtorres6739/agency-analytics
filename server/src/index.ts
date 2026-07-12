@@ -21,6 +21,7 @@ import {
   deleteDashboard,
   deleteFunnel,
   deleteGoal,
+  deleteUser,
   generatePdfReport,
   getDashboard,
   getDashboards,
@@ -68,10 +69,12 @@ import {
   getUserTraitValueUsers,
   getUserTraitValues,
   getUsers,
+  identifyUser,
   runCustomQuery,
   runDashboardCardQuery,
   updateDashboard,
   updateGoal,
+  updateUserTraits,
 } from "./api/analytics/index.js";
 import { getConfig, getVersion } from "./api/getConfig.js";
 import {
@@ -308,6 +311,9 @@ async function analyticsRoutes(fastify: FastifyInstance) {
 
   fastify.get("/sites/:siteId/users/session-count", publicSite, getUserSessionCount);
   fastify.get("/sites/:siteId/users/:userId", publicSite, getUserInfo);
+  fastify.post("/sites/:siteId/users/identify", authSite, identifyUser);
+  fastify.put("/sites/:siteId/users/:userId/traits", authSite, updateUserTraits);
+  fastify.delete("/sites/:siteId/users/:userId", adminSite, deleteUser);
   fastify.get("/sites/:siteId/user-traits/keys", publicSite, getUserTraitKeys);
   fastify.get("/sites/:siteId/user-traits/values", publicSite, getUserTraitValues);
   fastify.get("/sites/:siteId/user-traits/users", publicSite, getUserTraitValueUsers);

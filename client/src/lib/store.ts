@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Time } from "../components/DateSelector/types";
 import { LITE_DASHBOARD } from "./const";
-import { getStoredDashboardDefaultTime } from "./defaultTimeRange";
+import { getDashboardTimeForRange, getStoredDashboardDefaultTime } from "./defaultTimeRange";
 
 // The lite dashboard is backed by hourly materialized views, so anything finer
 // than an hour has no underlying data. Clamp auto-selected buckets up to "hour".
@@ -244,6 +244,11 @@ const getDefaultTime = (): Time => getStoredDashboardDefaultTime(getSystemTimezo
 
 const getDefaultTimeState = () => getTimeState(getDefaultTime());
 
+// The store is created during both server rendering and the browser's first
+// render. Keep that initial state independent of localStorage so React hydrates
+// the same markup; client-side URL/default-range initialization runs afterward.
+const getInitialTimeState = () => getTimeState(getDashboardTimeForRange("today", "UTC"));
+
 const getSiteStateForUrl = (state: Store, site: string, privateKey?: string | null): Partial<Store> => {
   const urlParams = getUrlParams();
   const hasTimeInUrl = urlParams?.has("timeMode") || urlParams?.has("wellKnown");
@@ -275,7 +280,7 @@ export const useStore = create<Store, [["zustand/persist", PersistedStore]]>(
       setSiteContext: (site, privateKey) => {
         set(state => getSiteStateForUrl(state, site, privateKey));
       },
-      ...getDefaultTimeState(),
+      ...getInitialTimeState(),
       setTime: (time, changeBucket = true) => {
         const nextTimeState = getTimeState(time);
 

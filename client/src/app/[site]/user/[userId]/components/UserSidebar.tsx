@@ -2,23 +2,34 @@
 
 import { useExtracted } from "next-intl";
 import { getTimezone } from "@/lib/store";
-import { Calendar, CalendarCheck, Clock, Files, Globe, Laptop, Monitor, Smartphone, Tablet } from "lucide-react";
+import { Calendar, CalendarCheck, Clock, Files, Globe, Laptop, Monitor, Pencil, Smartphone, Tablet } from "lucide-react";
 import { DateTime } from "luxon";
+import { useState } from "react";
 import { Avatar, generateName } from "../../../../../components/Avatar";
 import { Badge } from "../../../../../components/ui/badge";
-import { Skeleton } from "../../../../../components/ui/skeleton";
+import { Button } from "../../../../../components/ui/button";
 import { IdentifiedBadge } from "../../../../../components/IdentifiedBadge";
 import { useDateTimeFormat } from "../../../../../hooks/useDateTimeFormat";
 import { formatDuration } from "../../../../../lib/dateTimeUtils";
-import { getCountryName, getLanguageName } from "../../../../../lib/utils";
-import { Browser } from "../../../components/shared/icons/Browser";
-import { CountryFlag } from "../../../components/shared/icons/CountryFlag";
-import { OperatingSystem } from "../../../components/shared/icons/OperatingSystem";
 import { VisitCalendar } from "./Calendar";
 import { EventIcon, PageviewIcon } from "../../../../../components/EventIcons";
 import { UserInfo, UserSessionCountResponse } from "../../../../../api/analytics/endpoints";
-import { DeviceIcon } from "../../../components/shared/icons/Device";
+import { ChannelIcon, extractDomain, getDisplayName } from "../../../../../components/Channel";
+import { Favicon } from "../../../../../components/Favicon";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../../../../components/ui/tooltip";
 import { useConfigs } from "../../../../../lib/configs";
+import { userStore } from "../../../../../lib/userStore";
+import { PerformanceMetric } from "../../../performance/performanceStore";
+import {
+  formatMetricValue,
+  getMetricColor,
+  getMetricUnit,
+  METRIC_LABELS,
+  METRIC_LABELS_SHORT,
+} from "../../../performance/utils/performanceUtils";
+import { EditTraitsDialog } from "../../../../../components/EditTraitsDialog";
+import { LocationDevices } from "./LocationDevices";
+import { InfoRow, InfoRowSkeleton, SidebarCard, StatCard } from "./SidebarPrimitives";
 import { UserLocationMap } from "./UserLocationMap";
 
 interface UserSidebarProps {
@@ -28,73 +39,26 @@ interface UserSidebarProps {
   getRegionName: (region: string) => string;
 }
 
-// Reusable card wrapper for sidebar sections
-function SidebarCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={`bg-white dark:bg-neutral-900 rounded-lg border border-neutral-100 dark:border-neutral-850 p-4 ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-// Info row component for consistent styling
-function InfoRow({ icon, label, value }: { icon?: React.ReactNode; label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between py-1.5 border-b border-neutral-50 dark:border-neutral-850 last:border-0 text-xs">
-      <span className="text-neutral-500 dark:text-neutral-400">{label}</span>
-      <span className="text-neutral-700 dark:text-neutral-200 flex items-center gap-1.5">
-        {icon}
-        {value}
-      </span>
-    </div>
-  );
-}
-
-// Stat card component
-function StatCard({
-  icon,
-  label,
-  value,
-  isLoading,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-  isLoading: boolean;
-}) {
-  if (isLoading) {
-    return (
-      <div className="flex flex-col gap-0.5">
-        <div className="text-[10px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1 uppercase tracking-wide">
-          <Skeleton className="w-3 h-3 rounded" />
-          <Skeleton className="h-2.5 w-14 rounded" />
-        </div>
-        <Skeleton className="h-4 w-16 rounded" />
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-0.5">
-      <div className="text-[10px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1 uppercase tracking-wide">
-        {icon}
-        {label}
-      </div>
-      <div className="text-sm">{value}</div>
-    </div>
-  );
-}
+const VITALS_ORDER: PerformanceMetric[] = ["lcp", "cls", "inp", "fcp", "ttfb"];
 
 export function UserSidebar({ data, isLoading, sessionCount, getRegionName }: UserSidebarProps) {
   const t = useExtracted();
   const { formatRelative } = useDateTimeFormat();
   const { configs } = useConfigs();
+  const { user } = userStore();
+  const [traitsOpen, setTraitsOpen] = useState(false);
   const isIdentified = !!data?.identified_user_id;
 
   // Filter custom traits (exclude username, name, email)
   const customTraits = data?.traits
     ? Object.entries(data.traits).filter(([key]) => !["username", "name", "email"].includes(key))
+    : [];
+
+  const firstReferrerDomain = data?.first_referrer ? extractDomain(data.first_referrer) : null;
+  const channelChanged = !!data?.last_channel && data.last_channel !== data.first_channel;
+  const vitals = data?.vitals ?? null;
+  const vitalsToShow = vitals
+    ? VITALS_ORDER.filter(metric => vitals[`${metric}_p75`] != null)
     : [];
 
   return (
@@ -149,105 +113,76 @@ export function UserSidebar({ data, isLoading, sessionCount, getRegionName }: Us
         </div>
       </SidebarCard>
 
+      {/* Acquisition (first-touch attribution) */}
+      <SidebarCard>
+        <h3 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-2">
+          {t("Acquisition")}
+        </h3>
+        {isLoading ? (
+          <div>
+            <InfoRowSkeleton labelWidth="w-14" valueWidth="w-24" withIcon />
+            <InfoRowSkeleton labelWidth="w-12" valueWidth="w-20" withIcon />
+            <InfoRowSkeleton labelWidth="w-16" valueWidth="w-28" />
+          </div>
+        ) : (
+          <div>
+            <InfoRow
+              icon={data?.first_channel ? <ChannelIcon channel={data.first_channel} className="w-3.5 h-3.5" /> : undefined}
+              label={t("Channel")}
+              value={data?.first_channel || "—"}
+            />
+            <InfoRow
+              icon={firstReferrerDomain ? <Favicon domain={firstReferrerDomain} className="w-3.5 h-3.5" /> : undefined}
+              label={t("Referrer")}
+              value={firstReferrerDomain ? getDisplayName(firstReferrerDomain) : "—"}
+            />
+            <InfoRow
+              label={t("Landing page")}
+              value={
+                data?.first_entry_page ? (
+                  <span className="truncate max-w-[160px] inline-block" title={data.first_entry_page}>
+                    {data.first_entry_page}
+                  </span>
+                ) : (
+                  "—"
+                )
+              }
+            />
+            {data?.first_utm_source && (
+              <InfoRow
+                label={t("Source")}
+                value={<span className="truncate max-w-[160px] inline-block">{data.first_utm_source}</span>}
+              />
+            )}
+            {data?.first_utm_medium && (
+              <InfoRow
+                label={t("Medium")}
+                value={<span className="truncate max-w-[160px] inline-block">{data.first_utm_medium}</span>}
+              />
+            )}
+            {data?.first_utm_campaign && (
+              <InfoRow
+                label={t("Campaign")}
+                value={<span className="truncate max-w-[160px] inline-block">{data.first_utm_campaign}</span>}
+              />
+            )}
+            {channelChanged && (
+              <InfoRow
+                icon={<ChannelIcon channel={data.last_channel} className="w-3.5 h-3.5" />}
+                label={t("Latest channel")}
+                value={data.last_channel}
+              />
+            )}
+          </div>
+        )}
+      </SidebarCard>
+
       {/* Location & Device Info */}
       <SidebarCard>
         <h3 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-2">
           {t("Location & Device")}
         </h3>
-        {isLoading ? (
-          <div className="space-y-0">
-            {/* Country */}
-            <div className="flex items-center justify-between py-1.5 border-b border-neutral-50 dark:border-neutral-850">
-              <Skeleton className="h-3 w-14 rounded" />
-              <div className="flex items-center gap-1.5">
-                <Skeleton className="w-4 h-4 rounded" />
-                <Skeleton className="h-3 w-24 rounded" />
-              </div>
-            </div>
-            {/* Region */}
-            <div className="flex items-center justify-between py-1.5 border-b border-neutral-50 dark:border-neutral-850">
-              <Skeleton className="h-3 w-12 rounded" />
-              <Skeleton className="h-3 w-32 rounded" />
-            </div>
-            {/* Language */}
-            <div className="flex items-center justify-between py-1.5 border-b border-neutral-50 dark:border-neutral-850">
-              <Skeleton className="h-3 w-16 rounded" />
-              <Skeleton className="h-3 w-20 rounded" />
-            </div>
-            {/* Device */}
-            <div className="flex items-center justify-between py-1.5 border-b border-neutral-50 dark:border-neutral-850">
-              <Skeleton className="h-3 w-12 rounded" />
-              <div className="flex items-center gap-1.5">
-                <Skeleton className="w-4 h-4 rounded" />
-                <Skeleton className="h-3 w-14 rounded" />
-              </div>
-            </div>
-            {/* Browser */}
-            <div className="flex items-center justify-between py-1.5 border-b border-neutral-50 dark:border-neutral-850">
-              <Skeleton className="h-3 w-14 rounded" />
-              <div className="flex items-center gap-1.5">
-                <Skeleton className="w-4 h-4 rounded" />
-                <Skeleton className="h-3 w-20 rounded" />
-              </div>
-            </div>
-            {/* OS */}
-            <div className="flex items-center justify-between py-1.5 border-b border-neutral-50 dark:border-neutral-850">
-              <Skeleton className="h-3 w-8 rounded" />
-              <div className="flex items-center gap-1.5">
-                <Skeleton className="w-4 h-4 rounded" />
-                <Skeleton className="h-3 w-24 rounded" />
-              </div>
-            </div>
-            {/* Screen */}
-            <div className="flex items-center justify-between py-1.5">
-              <Skeleton className="h-3 w-12 rounded" />
-              <Skeleton className="h-3 w-16 rounded" />
-            </div>
-          </div>
-        ) : (
-          <div>
-            <InfoRow
-              icon={<CountryFlag country={data?.country || ""} className="w-4 h-4" />}
-              label={t("Country")}
-              value={data?.country ? getCountryName(data.country) : "—"}
-            />
-            <InfoRow
-              label={t("Region")}
-              value={
-                <span className="truncate max-w-[160px] inline-block">
-                  {data?.region ? getRegionName(data.region) : "—"}
-                  {data?.city && `, ${data.city}`}
-                </span>
-              }
-            />
-            <InfoRow label={t("Language")} value={data?.language ? getLanguageName(data.language) : "—"} />
-            <InfoRow
-              icon={
-                <DeviceIcon deviceType={data?.device_type || ""} size={13} />
-              }
-              label={t("Device")}
-              value={data?.device_type ?? "—"}
-            />
-            <InfoRow
-              icon={<Browser browser={data?.browser || "Unknown"} size={13} />}
-              label={t("Browser")}
-              value={data?.browser ? `${data.browser}${data.browser_version ? ` v${data.browser_version}` : ""}` : "—"}
-            />
-            <InfoRow
-              icon={<OperatingSystem os={data?.operating_system || ""} size={13} />}
-              label={t("OS")}
-              value={
-                data?.operating_system
-                  ? `${data.operating_system}${data.operating_system_version ? ` v${data.operating_system_version}` : ""}`
-                  : "—"
-              }
-            />
-            <InfoRow
-              label={t("Screen")}
-              value={data?.screen_width && data?.screen_height ? `${data.screen_width}×${data.screen_height}` : "—"}
-            />
-          </div>
-        )}
+        <LocationDevices data={data} isLoading={isLoading} getRegionName={getRegionName} />
       </SidebarCard>
 
       {/* Activity Calendar */}
@@ -260,23 +195,82 @@ export function UserSidebar({ data, isLoading, sessionCount, getRegionName }: Us
         </div>
       </SidebarCard>
 
-      {/* User Traits (identified users only) */}
-      {isIdentified && customTraits.length > 0 && (
+      {/* Web Vitals (p75 across this user's performance events) */}
+      {vitals && vitalsToShow.length > 0 && (
         <SidebarCard>
-          <h3 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-2">
-            {t("User Traits")}
-          </h3>
-          <div className="space-y-1">
-            {customTraits.map(([key, value]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between py-1 border-b border-neutral-50 dark:border-neutral-850 last:border-0 text-xs"
-              >
-                <span className="text-neutral-500 dark:text-neutral-400 capitalize">{key.replace(/_/g, " ")}</span>
-                <span className="text-neutral-700 dark:text-neutral-200 truncate max-w-[160px]">{String(value)}</span>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+              {t("Web Vitals")}
+            </h3>
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 uppercase tracking-wide">p75</span>
           </div>
+          <div>
+            {vitalsToShow.map(metric => {
+              const value = vitals[`${metric}_p75`] as number;
+              return (
+                <InfoRow
+                  key={metric}
+                  label={
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default">{METRIC_LABELS_SHORT[metric]}</span>
+                      </TooltipTrigger>
+                      <TooltipContent>{METRIC_LABELS[metric]}</TooltipContent>
+                    </Tooltip>
+                  }
+                  value={
+                    <span className={getMetricColor(metric, value)}>
+                      {formatMetricValue(metric, value)}
+                      {getMetricUnit(metric, value)}
+                    </span>
+                  }
+                />
+              );
+            })}
+          </div>
+        </SidebarCard>
+      )}
+
+      {/* User Traits (identified users only) */}
+      {isIdentified && data && (customTraits.length > 0 || !!user) && (
+        <SidebarCard>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+              {t("User Traits")}
+            </h3>
+            {user && (
+              <Button
+                variant="ghost"
+                size="smIcon"
+                className="-my-1.5 -mr-1.5 h-6 w-6 text-neutral-500"
+                aria-label={t("Edit Traits")}
+                onClick={() => setTraitsOpen(true)}
+              >
+                <Pencil className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
+          {customTraits.length > 0 ? (
+            <div className="space-y-1">
+              {customTraits.map(([key, value]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between py-1 border-b border-neutral-50 dark:border-neutral-850 last:border-0 text-xs"
+                >
+                  <span className="text-neutral-500 dark:text-neutral-400 capitalize">{key.replace(/_/g, " ")}</span>
+                  <span className="text-neutral-700 dark:text-neutral-200 truncate max-w-[160px]">{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-400 dark:text-neutral-500">{t("No traits yet")}</p>
+          )}
+          <EditTraitsDialog
+            userId={data.identified_user_id}
+            traits={data.traits}
+            open={traitsOpen}
+            onOpenChange={setTraitsOpen}
+          />
         </SidebarCard>
       )}
 

@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { clickhouse } from "../../../db/clickhouse/clickhouse.js";
+import { getFilterStatement } from "../utils/getFilterStatement.js";
 import { processResults } from "../utils/utils.js";
 import SqlString from "sqlstring";
 
@@ -10,6 +11,7 @@ export interface GetUserSessionCountRequest {
   Querystring: {
     user_id?: string;
     time_zone?: string;
+    filters?: string;
   };
 }
 
@@ -20,11 +22,15 @@ export type GetUserSessionCountResponse = {
 
 export async function getUserSessionCount(req: FastifyRequest<GetUserSessionCountRequest>, res: FastifyReply) {
   const { siteId } = req.params;
-  const { user_id: userId, time_zone: timeZone = "UTC" } = req.query;
+  const { user_id: userId, time_zone: timeZone = "UTC", filters } = req.query;
 
   if (!userId) {
     return res.status(400).send({ error: "user_id is required" });
   }
+
+  // The calendar spans the user's full history, so dimension filters apply
+  // but no time range does.
+  const filterStatement = getFilterStatement(filters ?? "", Number(siteId));
 
   const query = `
     SELECT
@@ -34,6 +40,7 @@ export async function getUserSessionCount(req: FastifyRequest<GetUserSessionCoun
     WHERE
       site_id = {siteId:Int32}
       AND (user_id = {userId:String} OR identified_user_id = {userId:String})
+      ${filterStatement}
     GROUP BY date
     ORDER BY date ASC
   `;

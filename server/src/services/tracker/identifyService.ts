@@ -39,7 +39,15 @@ const identifyPayloadSchema = z.object({
 // Anonymous events older than this are unlikely to belong to the identifying user.
 const BACKFILL_DAYS = 30;
 
-async function backfillIdentifiedUserId(siteId: number, anonymousId: string, userId: string) {
+// days: null backfills the device's full history — only for explicit admin
+// actions (dashboard identify), where the operator asserts the whole history
+// belongs to this user and the unbounded partition scan is a one-off.
+export async function backfillIdentifiedUserId(
+  siteId: number,
+  anonymousId: string,
+  userId: string,
+  days: number | null = BACKFILL_DAYS
+) {
   try {
     // session_replay_metadata has no `timestamp` column; its time column is
     // `start_time`. Using `timestamp` there throws ClickHouse error 47
@@ -51,8 +59,10 @@ async function backfillIdentifiedUserId(siteId: number, anonymousId: string, use
     ];
     for (const { name, timeColumn } of tables) {
       await clickhouse.command({
-        query: `ALTER TABLE ${name} UPDATE identified_user_id = {userId: String} WHERE site_id = {siteId: UInt16} AND user_id = {anonymousId: String} AND identified_user_id = '' AND ${timeColumn} >= now() - INTERVAL {days: UInt16} DAY`,
-        query_params: { userId, siteId, anonymousId, days: BACKFILL_DAYS },
+        query: `ALTER TABLE ${name} UPDATE identified_user_id = {userId: String} WHERE site_id = {siteId: UInt16} AND user_id = {anonymousId: String} AND identified_user_id = ''${
+          days !== null ? ` AND ${timeColumn} >= now() - INTERVAL {days: UInt16} DAY` : ""
+        }`,
+        query_params: { userId, siteId, anonymousId, ...(days !== null ? { days } : {}) },
       });
     }
     logger.info({ siteId, anonymousId, userId }, "Backfilled identified_user_id in ClickHouse");

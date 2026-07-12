@@ -195,16 +195,27 @@ export type {
 } from "./sessions";
 
 // Users endpoints
-export { fetchUsers, fetchUserSessionCount, fetchUserInfo } from "./users";
+export {
+  fetchUsers,
+  fetchUserSessionCount,
+  fetchUserInfo,
+  identifyUser,
+  updateUserTraits,
+  deleteUser,
+} from "./users";
 export type {
   UsersResponse,
   UserInfo,
+  UserVitals,
+  UserLocationBreakdown,
+  UserDeviceBreakdown,
   LinkedDevice,
   UserSessionCountResponse,
   UsersParams,
   UserSessionsParams,
   UserSessionCountParams,
   UsersListResponse,
+  IdentifyUserPayload,
 } from "./users";
 
 // Misc endpoints (retention, journeys, page titles, org event count)

@@ -37,6 +37,7 @@ export interface StandardSectionDialogBodyProps {
   countLabel?: string;
   filterParameter: FilterParameter;
   customFilters?: Filter[];
+  additionalFilters?: Filter[];
   customTime?: Time;
   lite?: boolean;
 }
@@ -58,6 +59,7 @@ export function StandardSectionDialogBody({
   countLabel,
   filterParameter,
   customFilters,
+  additionalFilters,
   customTime,
   lite = false,
 }: StandardSectionDialogBodyProps) {
@@ -67,6 +69,7 @@ export function StandardSectionDialogBody({
       parameter: filterParameter,
       limit: 100,
       customFilters,
+      additionalFilters,
       customTime,
       lite,
     });

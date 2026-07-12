@@ -87,7 +87,7 @@ export function SessionCard({ session, onClick, userId, expandedByDefault, highl
               <span className="text-xs text-neutral-600 dark:text-neutral-200 truncate max-w-[150px]">
                 {getUserDisplayName(session)}
               </span>
-              {!!session.identified_user_id && <IdentifiedBadge traits={session.traits} />}
+              {!!session.identified_user_id && <IdentifiedBadge traits={session.traits} userId={session.identified_user_id} />}
             </div>
             <span className="text-xs text-neutral-500 dark:text-neutral-400 ">
               <span className="group-hover/card:hidden">
@@ -190,7 +190,7 @@ export function SessionCard({ session, onClick, userId, expandedByDefault, highl
               <span className="text-xs text-neutral-600 dark:text-neutral-200 w-24 truncate hover:underline">
                 {getUserDisplayName(session)}
               </span>
-              {!!session.identified_user_id && <IdentifiedBadge traits={session.traits} />}
+              {!!session.identified_user_id && <IdentifiedBadge traits={session.traits} userId={session.identified_user_id} />}
             </Link>
           )}
 
