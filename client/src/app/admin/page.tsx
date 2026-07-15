@@ -44,12 +44,9 @@ function MobileSidebar() {
 }
 
 export default function AdminPage() {
-  if (!IS_CLOUD && !DEPLOYMENT) notFound();
+  // if (!IS_CLOUD && !DEPLOYMENT) notFound();
 
-  const [activeTab, setActiveTab] = useQueryState(
-    "tab",
-    parseAsStringLiteral(ADMIN_TABS).withDefault("organizations")
-  );
+  const [activeTab, setActiveTab] = useQueryState("tab", parseAsStringLiteral(ADMIN_TABS).withDefault("organizations"));
   const t = useExtracted();
 
   return (
