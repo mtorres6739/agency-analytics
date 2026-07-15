@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { admin, captcha, emailOTP, organization } from "better-auth/plugins";
+import { admin, captcha, emailOTP, mcp, organization } from "better-auth/plugins";
+import { ALL_SCOPE_STRINGS, OIDC_STANDARD_SCOPES } from "./scopes.js";
 import dotenv from "dotenv";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import pg from "pg";
@@ -30,6 +31,26 @@ const authLogger = createServiceLogger("better-auth");
 
 const pluginList = [
   admin(),
+  // OAuth provider for MCP clients (RFC 8414/9728 discovery, dynamic client
+  // registration, authorization-code + PKCE). The root /.well-known routes are
+  // registered in index.ts; token validation happens via auth.api.getMcpSession.
+  mcp({
+    loginPage: "/login",
+    ...(process.env.BASE_URL ? { resource: `${process.env.BASE_URL.replace(/\/$/, "")}/api/mcp` } : {}),
+    oidcConfig: {
+      loginPage: "/login",
+      // Registers the custom resource:action scopes so /mcp/authorize's
+      // invalid_scope check accepts them (merged after the standard scopes).
+      scopes: [...ALL_SCOPE_STRINGS],
+      // Advertised metadata is NOT derived from `scopes`. This feeds the
+      // RFC 9728 protected-resource document; the RFC 8414 authorization-server
+      // document is augmented in mcp/wellKnown.ts (better-auth builds it from a
+      // top-level option the mcp() plugin type doesn't expose).
+      metadata: {
+        scopes_supported: [...OIDC_STANDARD_SCOPES, ...ALL_SCOPE_STRINGS],
+      },
+    },
+  }),
   apiKey({
     ...(IS_CLOUD
       ? {

@@ -4,8 +4,32 @@ import NodeCache from "node-cache";
 import { db } from "../db/postgres/postgres.js";
 import { member, memberSiteAccess, sites, user, team, teamMember, teamSiteAccess } from "../db/postgres/schema.js";
 import { auth } from "./auth.js";
+import {
+  consumeBearerHandoff,
+  extractBearerToken,
+  INTERNAL_BEARER_HANDOFF_HEADER,
+  resolveBearerIdentity,
+  type BearerResolverDeps,
+} from "./bearerAuth.js";
+import { hasScope, type ScopeRequirement, type ScopeStatements } from "./scopes.js";
 import { siteConfig } from "./siteConfig.js";
 import { logger } from "./logger/logger.js";
+
+// The MCP gate injects fakes; the REST layer always uses better-auth.
+const bearerResolverDeps: BearerResolverDeps = {
+  verifyApiKey: apiKey => auth.api.verifyApiKey({ body: { key: apiKey } }),
+  getOAuthSession: token => auth.api.getMcpSession({ headers: new Headers({ authorization: `Bearer ${token}` }) }),
+};
+
+function resolveBearerTokenFromRequest(req: FastifyRequest): string | null {
+  // Priority: Authorization: Bearer header (recommended), then ?api_key= (testing).
+  const bearerToken = extractBearerToken(req.headers["authorization"]);
+  if (bearerToken) {
+    return bearerToken;
+  }
+  const queryApiKey = (req.query as any)?.api_key;
+  return typeof queryApiKey === "string" ? queryApiKey : null;
+}
 
 export function mapHeaders(headers: any) {
   const entries = Object.entries(headers);
@@ -247,76 +271,87 @@ export function invalidateSitesAccessCache(userId: string) {
 }
 
 /**
- * Verify an API key from the request and check organization membership.
+ * Resolve the org membership role for a bearer-authenticated user, scoped to
+ * either an explicit organization or the organization owning a site.
+ */
+async function resolveBearerUserOrgRole(
+  userId: string,
+  options: { organizationId?: string; siteId?: string | number }
+): Promise<{ valid: boolean; role: string | null; userId?: string }> {
+  // Determine the organization ID - either directly provided or looked up from site
+  let organizationId = options.organizationId;
+
+  if (!organizationId && options.siteId) {
+    // Get the site's organization
+    const siteRecords = await db
+      .select({
+        organizationId: sites.organizationId,
+      })
+      .from(sites)
+      .where(eq(sites.siteId, Number(options.siteId)))
+      .limit(1);
+
+    if (siteRecords.length > 0 && siteRecords[0].organizationId) {
+      organizationId = siteRecords[0].organizationId;
+    }
+  }
+
+  if (organizationId) {
+    // Check if the bearer credential's user is a member of the organization
+    const userMembership = await db
+      .select()
+      .from(member)
+      .where(and(eq(member.userId, userId), eq(member.organizationId, organizationId)))
+      .limit(1);
+
+    if (userMembership.length > 0) {
+      return { valid: true, role: userMembership[0].role, userId };
+    }
+  }
+  return { valid: false, role: null };
+}
+
+export interface BearerAuthResult {
+  valid: boolean;
+  role: string | null;
+  userId?: string;
+  rateLimited?: boolean;
+  /**
+   * Scope statements carried by the credential. null = unrestricted (legacy
+   * key with no permissions, or OAuth token with no custom scopes). Guards
+   * enforce these; this function only carries them.
+   */
+  statements: ScopeStatements | null;
+}
+
+/**
+ * Verify a bearer credential (API key, or an OAuth access token from the MCP
+ * plugin) from the request and check organization membership.
  * Returns rateLimited flag when the key is rejected due to rate limiting.
  */
 export async function checkApiKey(
   req: FastifyRequest,
   options: { organizationId?: string; siteId?: string | number }
-): Promise<{ valid: boolean; role: string | null; userId?: string; rateLimited?: boolean }> {
-  // Check if a valid API key was provided
-  // Priority: 1. Authorization: Bearer header (recommended), 2. Query parameter (testing only)
-  const authHeader = req.headers["authorization"];
-  const bearerToken =
-    authHeader && typeof authHeader === "string" && authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
-
-  const queryApiKey = (req.query as any)?.api_key;
-  const apiKey = bearerToken || queryApiKey;
-
-  if (apiKey && typeof apiKey === "string") {
-    try {
-      // Verify the API key using Better Auth
-      const result = await auth.api.verifyApiKey({
-        body: { key: apiKey },
-      });
-
-      if (result.valid && result.key) {
-        // Get the userId from the API key
-        const apiKeyUserId = result.key.referenceId;
-
-        // Determine the organization ID - either directly provided or looked up from site
-        let organizationId = options.organizationId;
-
-        if (!organizationId && options.siteId) {
-          // Get the site's organization
-          const siteRecords = await db
-            .select({
-              organizationId: sites.organizationId,
-            })
-            .from(sites)
-            .where(eq(sites.siteId, Number(options.siteId)))
-            .limit(1);
-
-          if (siteRecords.length > 0 && siteRecords[0].organizationId) {
-            organizationId = siteRecords[0].organizationId;
-          }
-        }
-
-        if (organizationId) {
-          // Check if the API key's user is a member of the organization
-          const userMembership = await db
-            .select()
-            .from(member)
-            .where(and(eq(member.userId, apiKeyUserId), eq(member.organizationId, organizationId)))
-            .limit(1);
-
-          if (userMembership.length > 0) {
-            return { valid: true, role: userMembership[0].role, userId: apiKeyUserId };
-          }
-        }
-        return { valid: false, role: null };
-      }
-
-      // Check if the key was rejected due to rate limiting
-      if (!result.valid && result.error?.code === "RATE_LIMITED") {
-        return { valid: false, role: null, rateLimited: true };
-      }
-    } catch (error) {
-      logger.error(error, "Error verifying API key");
-      // Continue to return false if API key verification fails
-    }
+): Promise<BearerAuthResult> {
+  const apiKey = resolveBearerTokenFromRequest(req);
+  if (!apiKey) {
+    return { valid: false, role: null, statements: null };
   }
-  return { valid: false, role: null };
+
+  // Reuse the MCP gate's verification when this is an in-process proxy call, so
+  // a tool call doesn't verify (and rate-limit) the key a second time.
+  const identity =
+    consumeBearerHandoff(req.headers[INTERNAL_BEARER_HANDOFF_HEADER], apiKey) ??
+    (await resolveBearerIdentity(apiKey, bearerResolverDeps));
+
+  if (identity.status === "rate_limited") {
+    return { valid: false, role: null, rateLimited: true, statements: null };
+  }
+  if (identity.status === "valid" && identity.userId) {
+    const membership = await resolveBearerUserOrgRole(identity.userId, options);
+    return { ...membership, statements: identity.statements };
+  }
+  return { valid: false, role: null, statements: null };
 }
 
 export async function getUserIdFromRequest(req: FastifyRequest): Promise<string | null> {
@@ -330,23 +365,14 @@ export async function getUserIdFromRequest(req: FastifyRequest): Promise<string 
     return session.user.id;
   }
 
-  // Fall back to API key auth
-  const authHeader = req.headers["authorization"];
-  const bearerToken =
-    authHeader && typeof authHeader === "string" && authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
-  const queryApiKey = (req.query as any)?.api_key;
-  const apiKey = bearerToken || queryApiKey;
-
-  if (apiKey && typeof apiKey === "string") {
-    try {
-      const result = await auth.api.verifyApiKey({
-        body: { key: apiKey },
-      });
-      if (result.valid && result.key?.referenceId) {
-        return result.key.referenceId;
-      }
-    } catch (error) {
-      logger.error(error, "Error verifying API key");
+  // Fall back to bearer auth (API key or OAuth token).
+  const apiKey = resolveBearerTokenFromRequest(req);
+  if (apiKey) {
+    const identity =
+      consumeBearerHandoff(req.headers[INTERNAL_BEARER_HANDOFF_HEADER], apiKey) ??
+      (await resolveBearerIdentity(apiKey, bearerResolverDeps));
+    if (identity.status === "valid" && identity.userId) {
+      return identity.userId;
     }
   }
 
@@ -354,7 +380,11 @@ export async function getUserIdFromRequest(req: FastifyRequest): Promise<string 
 }
 
 // for routes that are potentially public
-export async function getUserHasAccessToSitePublic(req: FastifyRequest, siteId: string | number) {
+export async function getUserHasAccessToSitePublic(
+  req: FastifyRequest,
+  siteId: string | number,
+  requiredScope?: ScopeRequirement
+) {
   const [userSites, config] = await Promise.all([getSitesUserHasAccessTo(req), siteConfig.getConfig(siteId)]);
 
   // Check if user has direct access to the site
@@ -374,8 +404,10 @@ export async function getUserHasAccessToSitePublic(req: FastifyRequest, siteId: 
     return true;
   }
 
+  // Bearer-credential fallback. Scopes apply here too — without this check a
+  // scoped key could reach any public-guard route on a private site.
   const result = await checkApiKey(req, { siteId });
-  if (result.valid) {
+  if (result.valid && (!requiredScope || hasScope(result.statements, requiredScope))) {
     return true;
   }
 
