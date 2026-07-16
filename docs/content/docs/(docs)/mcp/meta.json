@@ -1,0 +1,11 @@
+{
+  "title": "AI integrations (MCP)",
+  "pages": [
+    "claude-code",
+    "codex",
+    "claude-desktop",
+    "cursor",
+    "vscode",
+    "opencode"
+  ]
+}
