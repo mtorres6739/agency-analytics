@@ -212,6 +212,62 @@ pre {
   }
 }
 
+/* ── Feature demo decorations ────────────────────────────────────────────
+   Used by the landing feature cards (Cards/*). Base state is the finished
+   frame — every animation is additive polish, removed under reduced motion. */
+.demo-bar {
+  transform-origin: left center;
+  animation: demo-bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes demo-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.demo-marker {
+  animation: demo-marker-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes demo-marker-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.journey-flow {
+  stroke-dasharray: 3 9;
+  animation: journey-flow-drift 2.6s linear infinite;
+}
+
+@keyframes journey-flow-drift {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.journey-ribbon {
+  animation: dataline-fade 0.8s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-bar,
+  .demo-marker,
+  .journey-flow,
+  .journey-ribbon {
+    animation: none;
+  }
+}
+
 @keyframes accordion-down {
   from {
     height: 0;

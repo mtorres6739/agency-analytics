@@ -12,7 +12,7 @@ interface CardProps {
 export function Card({ title, description, children, className, icon: Icon }: CardProps) {
   return (
     <div
-      className={cn("overflow-hidden bg-white p-5 dark:bg-neutral-950 md:p-8", className)}
+      className={cn("flex h-full flex-col overflow-hidden bg-white p-5 dark:bg-neutral-950 md:p-8", className)}
     >
       <div className="flex items-center gap-2.5">
         {Icon && <Icon className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />}

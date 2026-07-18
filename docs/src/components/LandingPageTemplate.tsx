@@ -1,10 +1,12 @@
 import { CTASection } from "@/components/CTASection";
 import { FAQAccordion } from "@/components/FAQAccordion";
 import { AgentConsole } from "@/components/Cards/AgentConsole";
+import { Autocapture } from "@/components/Cards/Autocapture";
 import { Funnels } from "@/components/Cards/Funnels";
-import { RealTimeAnalytics } from "@/components/Cards/RealTimeAnalytics";
+import { Journeys } from "@/components/Cards/Journeys";
 import { SessionReplay } from "@/components/Cards/SessionReplay";
 import { UserSessions } from "@/components/Cards/UserSessions";
+import { WebVitals } from "@/components/Cards/WebVitals";
 import { GridCrosses } from "@/components/GridCrosses";
 import { SectionKicker } from "@/components/deco/SectionKicker";
 import { TrackingSnippet } from "@/components/deco/TrackingSnippet";
@@ -349,15 +351,15 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
               <div className="flex items-end px-5 py-10 sm:px-8 md:py-20 lg:col-span-5 lg:px-10">
                 <p className="max-w-md text-lg leading-8 text-neutral-600 dark:text-neutral-400 text-pretty">
                   {t(
-                    "Start with live traffic, inspect the people and paths behind it, then measure where they convert."
+                    "Capture every interaction automatically, watch the sessions behind it, then measure what converts and how fast it feels."
                   )}
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-px bg-neutral-200 p-px dark:bg-neutral-800 lg:grid-cols-12">
+            <div className="grid grid-cols-1 gap-px bg-neutral-200 p-px dark:bg-neutral-800 lg:grid-cols-12">
               <div className="bg-white dark:bg-neutral-950 lg:col-span-7 [&>div]:h-full">
-                <RealTimeAnalytics />
+                <Autocapture />
               </div>
               <div className="bg-white dark:bg-neutral-950 lg:col-span-5 [&>div]:h-full">
                 <SessionReplay />
@@ -367,6 +369,12 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
               </div>
               <div className="bg-white dark:bg-neutral-950 lg:col-span-7 [&>div]:h-full">
                 <Funnels />
+              </div>
+              <div className="bg-white dark:bg-neutral-950 lg:col-span-7 [&>div]:h-full">
+                <Journeys />
+              </div>
+              <div className="bg-white dark:bg-neutral-950 lg:col-span-5 [&>div]:h-full">
+                <WebVitals />
               </div>
             </div>
           </div>
