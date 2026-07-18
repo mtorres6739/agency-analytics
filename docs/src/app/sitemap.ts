@@ -96,5 +96,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  return [...staticPages, ...comparisonPages, ...toolPages, ...docPages, ...blogPosts];
+  // Persona / solutions pages
+  const personaSlugs = [
+    "for-agencies",
+    "for-developers",
+    "for-startups",
+    "for-saas",
+    "for-ecommerce",
+    "for-creators",
+    "for-european-companies",
+    "enterprise",
+  ];
+  const personaPages = personaSlugs.map(slug => ({
+    url: `${baseUrl}/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: "monthly" as const,
+    priority: 0.8,
+  }));
+
+  return [...staticPages, ...personaPages, ...comparisonPages, ...toolPages, ...docPages, ...blogPosts];
 }
