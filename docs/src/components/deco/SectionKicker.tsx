@@ -13,7 +13,10 @@ export function SectionKicker({ children, className }: { children: React.ReactNo
         className
       )}
     >
-      <span aria-hidden="true" className="size-2 rounded-[1px] bg-emerald-600 dark:bg-emerald-400" />
+      <span
+        aria-hidden="true"
+        className="size-2 rounded-[1px] bg-emerald-600 [animation:kicker-pulse_3.2s_ease-in-out_infinite] dark:bg-emerald-400 motion-reduce:animate-none"
+      />
       {children}
     </p>
   );

@@ -13,16 +13,19 @@ export interface PricingCardProps {
   title: string;
   description: string;
   priceDisplay: React.ReactNode;
-  buttonText?: string;
-  buttonHref?: string;
+  buttonText: string;
+  buttonHref: string;
   buttonVariant?: "default" | "primary";
   features: FeatureItem[];
-  footerText?: React.ReactNode;
-  variant?: "free" | "default";
+  /** Marks the plan as the signal plate: emerald edge, plate tint, graph texture, badge. */
   recommended?: boolean;
-  customButton?: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
+  /**
+   * Standalone bordered card (mobile carousel). Omit when the card is a cell
+   * of the seamed `gap-px` plan grid, where the grid supplies the hairlines.
+   */
+  framed?: boolean;
+  className?: string;
+  featuresClassName?: string;
   eventLocation?: string;
 }
 
@@ -34,17 +37,14 @@ export function PricingCard({
   buttonHref,
   buttonVariant = "primary",
   features,
-  footerText,
-  variant = "default",
   recommended = false,
-  customButton,
-  onClick,
-  disabled,
+  framed = false,
+  className,
+  featuresClassName,
   eventLocation,
 }: PricingCardProps) {
   const t = useExtracted();
   const [isExpanded, setIsExpanded] = useState(false);
-  const isFree = variant === "free";
   const isPrimary = buttonVariant === "primary";
   const shouldShowToggle = features.length > 7;
   const displayedFeatures = shouldShowToggle && !isExpanded ? features.slice(0, 7) : features;
@@ -59,15 +59,26 @@ export function PricingCard({
   return (
     <div
       className={cn(
-        "h-full overflow-hidden rounded-lg border bg-white dark:bg-neutral-950",
-        recommended
-          ? "border-emerald-500 bg-gradient-to-b from-emerald-500/[0.07] via-transparent to-transparent"
-          : isFree
-            ? "border-neutral-200 text-neutral-600 dark:border-neutral-800 dark:text-neutral-300"
-            : "border-neutral-300 dark:border-neutral-800"
+        "relative h-full overflow-hidden",
+        recommended ? "bg-plate-accent" : "bg-white dark:bg-neutral-950",
+        framed
+          ? cn(
+              "rounded-lg border",
+              recommended ? "border-emerald-500" : "border-neutral-200 dark:border-neutral-800"
+            )
+          : // Inside the seamed grid the emerald hairline replaces the 1px seam
+            // around the cell, so the signal plate carries its own edge.
+            recommended && "z-10 outline outline-1 outline-emerald-500",
+        className
       )}
     >
-      <div className="p-6">
+      {recommended && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-graph-accent [mask-image:linear-gradient(to_bottom,black,transparent_70%)]"
+        />
+      )}
+      <div className="relative p-6">
         <div className="mb-5">
           <div className="mb-2 flex items-center gap-2">
             <h3 className="text-xl font-semibold tracking-tight">{title}</h3>
@@ -80,35 +91,21 @@ export function PricingCard({
           <p className="min-h-10 text-sm leading-5 text-neutral-600 dark:text-neutral-400">{description}</p>
         </div>
 
-        <div className="mb-6">{priceDisplay}</div>
+        <div className="mb-6 min-h-16">{priceDisplay}</div>
 
-        {customButton ? (
-          customButton
-        ) : buttonHref ? (
-          <AppLink
-            href={buttonHref}
-            aria-disabled={disabled}
-            onClick={(event) => {
-              if (disabled) {
-                event.preventDefault();
-                return;
-              }
-              if (eventLocation) trackAdEvent("signup", { location: "pricing" });
-              onClick?.();
-            }}
-            data-rybbit-event={eventLocation ? "signup" : undefined}
-            data-rybbit-prop-location={eventLocation}
-            className={cn(buttonClasses, disabled && "pointer-events-none opacity-50")}
-          >
-            {buttonText}
-          </AppLink>
-        ) : (
-          <button onClick={onClick} disabled={disabled} className={buttonClasses}>
-            {buttonText}
-          </button>
-        )}
+        <AppLink
+          href={buttonHref}
+          onClick={() => {
+            if (eventLocation) trackAdEvent("signup", { location: "pricing" });
+          }}
+          data-rybbit-event={eventLocation ? "signup" : undefined}
+          data-rybbit-prop-location={eventLocation}
+          className={buttonClasses}
+        >
+          {buttonText}
+        </AppLink>
 
-        <div className="mb-1 mt-6 space-y-3">
+        <div className={cn("mb-1 mt-6 space-y-3", featuresClassName)}>
           {displayedFeatures.map((item, index) => {
             const isObject = typeof item === "object";
             const feature = isObject ? item.feature : item;
@@ -128,7 +125,7 @@ export function PricingCard({
 
           {shouldShowToggle && (
             <button
-              onClick={() => setIsExpanded((expanded) => !expanded)}
+              onClick={() => setIsExpanded(expanded => !expanded)}
               aria-expanded={isExpanded}
               className="mt-2 flex cursor-pointer items-center gap-3 rounded-sm text-sm text-neutral-600 transition-colors hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 dark:text-neutral-400 dark:hover:text-white"
             >
@@ -137,12 +134,6 @@ export function PricingCard({
             </button>
           )}
         </div>
-
-        {footerText && (
-          <p className="mt-4 flex items-center justify-center gap-2 text-center text-sm text-neutral-600 dark:text-neutral-400">
-            {footerText}
-          </p>
-        )}
       </div>
     </div>
   );

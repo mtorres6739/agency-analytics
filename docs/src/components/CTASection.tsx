@@ -1,9 +1,9 @@
 import { CtaDataLine } from "@/components/deco/CtaDataLine";
+import { WatchfulFrog } from "@/components/deco/WatchfulFrog";
 import { GridCrosses } from "@/components/GridCrosses";
 import { TrackedButton } from "@/components/TrackedButton";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import { useExtracted } from "next-intl";
-import Image from "next/image";
 
 interface CTASectionProps {
   title?: string;
@@ -31,7 +31,7 @@ export function CTASection({
   const resolvedSecondaryButtonText = secondaryButtonText ?? t("Live demo");
 
   return (
-    <section className="relative overflow-hidden border-b border-emerald-900 bg-emerald-950 text-white">
+    <section className="group relative overflow-hidden border-b border-emerald-900 bg-emerald-950 text-white">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:40px_40px] [mask-image:linear-gradient(to_bottom,black,transparent_92%)]"
@@ -39,14 +39,11 @@ export function CTASection({
       <CtaDataLine className="h-36 lg:h-44" />
       <div className="relative mx-auto grid max-w-[1200px] border-x border-white/10 lg:grid-cols-12">
         <GridCrosses className="text-white/30 dark:text-white/30" />
-        <Image
-          src="/rybbit/frog_white.svg"
-          alt=""
-          aria-hidden="true"
-          width={360}
-          height={360}
-          className="pointer-events-none absolute -bottom-12 -right-8 hidden w-64 -rotate-6 opacity-[0.07] md:block lg:w-80"
-        />
+        {/* The watermark frog, awake: it perks up when you hover the section,
+            and its eye follows the cursor (WatchfulFrog). */}
+        <div className="pointer-events-none absolute -bottom-12 -right-8 hidden w-64 -rotate-6 text-white opacity-[0.07] transition-[transform,opacity] duration-500 ease-out group-hover:-translate-y-2 group-hover:opacity-[0.12] motion-reduce:transition-none motion-reduce:group-hover:translate-y-0 md:block lg:w-80">
+          <WatchfulFrog />
+        </div>
 
         <div className="relative z-10 border-b border-white/10 px-5 py-16 sm:px-8 md:py-24 lg:col-span-8 lg:border-b-0 lg:border-r lg:px-10">
           <h2 className="max-w-3xl text-4xl font-semibold leading-[1.02] tracking-[-0.035em] md:text-6xl text-balance">

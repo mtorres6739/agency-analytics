@@ -269,6 +269,55 @@ pre {
   }
 }
 
+/* ── Personality touches ─────────────────────────────────────────────────
+   Small living details at the edges of the marketing pages: the watermark
+   frogs blink (their cursor-tracking is JS in WatchfulFrog), the footer
+   frog hops on hover, the section kicker's signal square breathes like an
+   indicator light. All additive over a fully-visible base state. */
+.frog-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: frog-blink 7s ease-in-out 2.5s infinite;
+}
+
+@keyframes frog-blink {
+  0%,
+  91.5%,
+  96.5%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes frog-hop {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes kicker-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frog-eye {
+    animation: none;
+  }
+}
+
 @keyframes accordion-down {
   from {
     height: 0;

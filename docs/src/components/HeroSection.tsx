@@ -1,6 +1,7 @@
 import { GitHubStarButton } from "@/components/GitHubStarButton";
 import { GridCrosses } from "@/components/GridCrosses";
 import { HeroDataLine } from "@/components/HeroDataLine";
+import { WatchfulFrog } from "@/components/deco/WatchfulFrog";
 import { TrackedButton } from "@/components/TrackedButton";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import { useExtracted } from "next-intl";
@@ -101,12 +102,40 @@ export function HeroSection({
 
         <div className="relative min-w-0 border-t border-neutral-200 bg-neutral-100 p-2 [background-image:radial-gradient(circle,rgba(0,0,0,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:border-neutral-800 dark:bg-neutral-900 dark:[background-image:radial-gradient(circle,rgba(255,255,255,0.07)_1px,transparent_1px)] sm:p-3">
           <GridCrosses />
-          <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+          {/* Peeking over the demo window; the browser card below is
+              `relative`, so DOM order lets it occlude the frog's body. */}
+          <div className="pointer-events-none absolute -top-12 right-10 hidden w-24 -rotate-2 text-neutral-950 opacity-[0.12] dark:text-white dark:opacity-[0.09] md:block lg:right-16 lg:w-28">
+            <WatchfulFrog />
+          </div>
+          <div className="relative min-w-0 max-w-full overflow-hidden rounded-lg border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
             <div className="grid h-10 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-neutral-200 px-3 dark:border-neutral-800 sm:px-4">
-              <div className="flex gap-1.5" aria-hidden="true">
-                <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-                <span className="size-2.5 rounded-full bg-[#febc2e]" />
-                <span className="size-2.5 rounded-full bg-[#28c840]" />
+              {/* Real macOS behavior: the glyphs only appear when you mouse
+                  over the light cluster. A small reward for the curious. */}
+              <div className="group/lights flex gap-1.5" aria-hidden="true">
+                <span className="flex size-2.5 items-center justify-center rounded-full bg-[#ff5f57]">
+                  <svg
+                    viewBox="0 0 8 8"
+                    className="size-1.5 opacity-0 transition-opacity duration-150 group-hover/lights:opacity-100 motion-reduce:transition-none"
+                  >
+                    <path d="M2.2 2.2l3.6 3.6M5.8 2.2L2.2 5.8" stroke="#8c1a10" strokeWidth="1.1" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="flex size-2.5 items-center justify-center rounded-full bg-[#febc2e]">
+                  <svg
+                    viewBox="0 0 8 8"
+                    className="size-1.5 opacity-0 transition-opacity duration-150 group-hover/lights:opacity-100 motion-reduce:transition-none"
+                  >
+                    <path d="M1.6 4h4.8" stroke="#99590c" strokeWidth="1.1" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="flex size-2.5 items-center justify-center rounded-full bg-[#28c840]">
+                  <svg
+                    viewBox="0 0 8 8"
+                    className="size-1.5 opacity-0 transition-opacity duration-150 group-hover/lights:opacity-100 motion-reduce:transition-none"
+                  >
+                    <path d="M4 1.6v4.8M1.6 4h4.8" stroke="#0d5f14" strokeWidth="1.1" strokeLinecap="round" />
+                  </svg>
+                </span>
               </div>
               <a
                 href="https://demo.rybbit.com/81"

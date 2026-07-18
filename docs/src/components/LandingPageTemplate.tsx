@@ -7,8 +7,8 @@ import { Journeys } from "@/components/Cards/Journeys";
 import { SessionReplay } from "@/components/Cards/SessionReplay";
 import { UserSessions } from "@/components/Cards/UserSessions";
 import { WebVitals } from "@/components/Cards/WebVitals";
-import { CapabilityFeatures } from "@/components/CapabilityFeatures";
 import { GridCrosses } from "@/components/GridCrosses";
+import { ConsoleGreeting } from "@/components/deco/ConsoleGreeting";
 import { SectionKicker } from "@/components/deco/SectionKicker";
 import { TrackingSnippet } from "@/components/deco/TrackingSnippet";
 import { HeroSection } from "@/components/HeroSection";
@@ -122,97 +122,51 @@ const customerLogos = [
 export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: LandingPageTemplateProps) {
   const t = useExtracted();
 
-  const featureGroups = [
+  // The feature index band: every label links to its feature or docs page, so
+  // the band doubles as the evaluator's checklist and the page's internal-link hub.
+  const capabilityIndex = [
     {
       title: t("Understand"),
-      description: t("A clear read on what is happening, without configuring a report first."),
-      iconClassName: "text-emerald-600 dark:text-emerald-400",
-      features: [
-        {
-          icon: "zap" as const,
-          title: t("Setup in minutes"),
-          description: t("Add one line of code and start seeing real-time data instantly."),
-        },
-        {
-          icon: "activity" as const,
-          title: t("Realtime data"),
-          description: t("See what's happening on your site right now."),
-        },
-        {
-          icon: "gauge" as const,
-          title: t("Web vitals"),
-          description: t("Monitor Core Web Vitals for fast user experiences."),
-        },
-        { icon: "bell" as const, title: t("Email reports"), description: t("Automated reports delivered to your inbox.") },
+      dotClassName: "bg-emerald-600 dark:bg-emerald-400",
+      links: [
+        { label: t("Realtime data"), href: "/features/web-analytics" },
+        { label: t("Web vitals"), href: "/features/web-vitals" },
+        { label: t("Globe views"), href: "/docs/feature-guides/globe" },
+        { label: t("Email reports"), href: "/docs/account-settings" },
+        { label: t("Setup in minutes"), href: "/docs/script" },
       ],
     },
     {
       title: t("Investigate"),
-      description: t("Move from the headline number to the behavior behind it."),
-      iconClassName: "text-blue-600 dark:text-blue-400",
-      features: [
-        {
-          icon: "play" as const,
-          title: t("Session replay"),
-          description: t("Watch real user sessions to spot usability issues."),
-        },
-        {
-          icon: "route" as const,
-          title: t("User journeys"),
-          description: t("Map how users navigate from landing to conversion."),
-        },
-        {
-          icon: "earth" as const,
-          title: t("Globe views"),
-          description: t("Watch traffic flow with detailed 3D globe visualizations."),
-        },
-        { icon: "users" as const, title: t("Organizations"), description: t("Manage sites and team access in one place.") },
+      dotClassName: "bg-blue-600 dark:bg-blue-400",
+      links: [
+        { label: t("Session replay"), href: "/features/session-replay" },
+        { label: t("User journeys"), href: "/features/user-journeys" },
+        { label: t("User profiles"), href: "/features/user-profiles" },
+        { label: t("Error tracking"), href: "/features/error-tracking" },
+        { label: t("Organizations"), href: "/docs/teams" },
       ],
     },
     {
       title: t("Measure"),
-      description: t("Define the outcomes that matter and follow them end to end."),
-      iconClassName: "text-amber-700 dark:text-amber-400",
-      features: [
-        {
-          icon: "arrow-down" as const,
-          title: t("Funnels"),
-          description: t("Visualize conversion paths and find where visitors drop off."),
-        },
-        {
-          icon: "layers" as const,
-          title: t("Custom events"),
-          description: t("Track sign-ups, purchases, and any user interaction."),
-        },
-        { icon: "link" as const, title: t("API"), description: t("Full API access to build custom integrations.") },
-        { icon: "download" as const, title: t("Data export"), description: t("Export your raw data anytime. No lock-in.") },
+      dotClassName: "bg-amber-600 dark:bg-amber-400",
+      links: [
+        { label: t("Funnels"), href: "/features/funnels" },
+        { label: t("Goals"), href: "/features/goals" },
+        { label: t("Retention"), href: "/features/retention" },
+        { label: t("Custom events"), href: "/features/custom-events" },
+        { label: t("API & data export"), href: "/docs/api/getting-started" },
       ],
     },
     {
       title: t("Stay private"),
-      description: t("Clean data and a lighter privacy footprint, by default."),
-      iconClassName: "text-violet-600 dark:text-violet-400",
-      features: [
-        {
-          icon: "bot" as const,
-          title: t("Bot blocking"),
-          description: t("Automatically filter out bots to keep data clean."),
-        },
-        {
-          icon: "ban" as const,
-          title: t("No cookies"),
-          description: t("Zero cookies, zero banners. Cleaner visitor experiences."),
-        },
-        {
-          icon: "shield-check" as const,
-          title: t("GDPR & CCPA"),
-          description: t("Privacy-first design means you're compliant out of the box."),
-        },
-        {
-          icon: "terminal" as const,
-          title: t("Open source"),
-          description: t("100% open source. Self-host or use our cloud."),
-        },
+      dotClassName: "bg-violet-600 dark:bg-violet-400",
+      links: [
+        { label: t("No cookies"), href: "/privacy" },
+        { label: t("GDPR & CCPA"), href: "/dpa" },
+        { label: t("Bot blocking"), href: "/docs/bot-detection" },
+        { label: t("Self-hosting"), href: "/docs/self-hosting" },
+        { label: t("Open source"), href: "https://github.com/rybbit-io/rybbit", external: true },
       ],
     },
   ];
@@ -226,6 +180,7 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+      <ConsoleGreeting />
       <div className="overflow-clip">
         <HeroSection title={title} subtitle={subtitle} showEUFlag={showEUFlag} />
 
@@ -260,42 +215,6 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
                 </div>
               );
             })}
-          </div>
-        </section>
-
-        <section className="border-b border-neutral-200 dark:border-neutral-800" aria-labelledby="capabilities-title">
-          <div className="relative mx-auto grid max-w-[1200px] border-x border-neutral-200 dark:border-neutral-800 lg:grid-cols-12">
-            <GridCrosses />
-            <div className="border-b border-neutral-200 px-5 py-16 dark:border-neutral-800 sm:px-8 md:py-24 lg:col-span-4 lg:border-b-0 lg:border-r lg:px-10">
-              <div className="lg:sticky lg:top-24">
-                <h2
-                  id="capabilities-title"
-                  className="max-w-sm text-4xl font-semibold leading-[1.02] tracking-[-0.035em] md:text-5xl"
-                >
-                  {t("The whole picture, in one place.")}
-                </h2>
-                <p className="mt-6 max-w-sm text-base leading-7 text-neutral-600 dark:text-neutral-400">
-                  {t(
-                    "Rybbit connects the essential analytics workflows into one coherent product, so every answer starts from the same source of truth."
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid lg:col-span-8 md:grid-cols-2">
-              {featureGroups.map(group => (
-                <article
-                  key={group.title}
-                  className="border-b border-neutral-200 px-5 py-12 last:border-b-0 dark:border-neutral-800 sm:px-8 md:odd:border-r md:[&:nth-last-child(-n+2)]:border-b-0 lg:px-10"
-                >
-                  <h3 className="text-xl font-semibold tracking-tight">{group.title}</h3>
-                  <p className="mt-2 min-h-12 max-w-md text-sm leading-6 text-neutral-600 dark:text-neutral-400">
-                    {group.description}
-                  </p>
-                  <CapabilityFeatures features={group.features} iconClassName={group.iconClassName} />
-                </article>
-              ))}
-            </div>
           </div>
         </section>
 
@@ -347,6 +266,50 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
                 <WebVitals />
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="border-b border-neutral-200 dark:border-neutral-800" aria-labelledby="capability-index-title">
+          <div className="relative mx-auto max-w-[1200px] border-x border-neutral-200 dark:border-neutral-800">
+            <GridCrosses />
+            <div className="flex flex-col gap-3 border-b border-neutral-200 px-5 py-10 dark:border-neutral-800 sm:px-8 md:flex-row md:items-baseline md:justify-between md:gap-8 lg:px-10">
+              <h2 id="capability-index-title" className="text-2xl font-semibold tracking-tight md:text-3xl">
+                {t("Everything behind one script tag.")}
+              </h2>
+              <p className="max-w-md text-sm leading-6 text-neutral-600 dark:text-neutral-400">
+                {t("Replay, funnels, goals, vitals, exports — everything Google Analytics made complicated, one click deeper.")}
+              </p>
+            </div>
+            <nav
+              aria-label={t("Feature index")}
+              className="grid grid-cols-1 gap-px bg-neutral-200 p-px dark:bg-neutral-800 sm:grid-cols-2 lg:grid-cols-4"
+            >
+              {capabilityIndex.map(group => (
+                <div key={group.title} className="bg-white px-5 py-6 dark:bg-neutral-950 sm:px-8 lg:px-6 xl:px-8">
+                  <h3 className="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
+                    <span aria-hidden="true" className={`size-2 rounded-[1px] ${group.dotClassName}`} />
+                    {group.title}
+                  </h3>
+                  <ul className="-mx-1.5 mt-3">
+                    {group.links.map(link => (
+                      <li key={link.href}>
+                        <Link
+                          href={link.href}
+                          {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                          className="group/link flex items-center justify-between gap-2 rounded-sm px-1.5 py-1.5 text-sm text-neutral-600 transition-colors duration-200 hover:bg-neutral-100 hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-white"
+                        >
+                          {link.label}
+                          <ArrowRight
+                            className="size-3.5 shrink-0 text-neutral-400 transition-transform duration-200 group-hover/link:translate-x-0.5 motion-reduce:transition-none dark:text-neutral-600"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </nav>
           </div>
         </section>
 
