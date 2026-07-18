@@ -129,12 +129,13 @@ pre {
 }
 
 /* ── Marketing data-line decoration ──────────────────────────────────────
-   The plotted line draws itself on load (pathLength=1, so dasharray/offset
-   run 1 → 0). Base state is the fully-drawn line: with reduced motion the
+   The plotted line draws itself on load via a left→right clip-path wipe.
+   Not stroke-dasharray: with vector-effect: non-scaling-stroke, Chromium
+   measures dashes in screen space, so under the anisotropic stretch of
+   preserveAspectRatio="none" a "full-length" dash falls short and the line
+   ends partway. Base state is the fully-drawn line: with reduced motion the
    animation is simply removed and the decoration is static. */
 .dataline-path {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
   animation: dataline-draw 1.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
 
@@ -148,10 +149,10 @@ pre {
 
 @keyframes dataline-draw {
   from {
-    stroke-dashoffset: 1;
+    clip-path: inset(0 100% 0 0);
   }
   to {
-    stroke-dashoffset: 0;
+    clip-path: inset(0 0 0 0);
   }
 }
 

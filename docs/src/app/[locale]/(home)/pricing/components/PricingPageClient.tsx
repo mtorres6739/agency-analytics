@@ -9,7 +9,7 @@ export function PricingPageClient() {
   const [isAnnual, setIsAnnual] = useState(true);
   return (
     <div className="overflow-x-clip">
-      <PricingSection isAnnual={isAnnual} setIsAnnual={setIsAnnual} />
+      <PricingSection isAnnual={isAnnual} setIsAnnual={setIsAnnual} standalone />
       <ComparisonSection isAnnual={isAnnual} />
       <CTASection eventLocation="pricing_bottom_cta" />
     </div>

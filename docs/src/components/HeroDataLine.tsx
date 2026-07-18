@@ -54,7 +54,6 @@ export function HeroDataLine({ id, className }: HeroDataLineProps) {
         <path
           className="dataline-path"
           d={LINE_PATH}
-          pathLength={1}
           stroke="var(--dataviz)"
           strokeWidth="1.5"
           strokeLinecap="round"

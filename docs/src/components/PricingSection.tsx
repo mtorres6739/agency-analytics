@@ -2,6 +2,7 @@
 
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { GridCrosses } from "@/components/GridCrosses";
+import { HeroDataLine } from "@/components/HeroDataLine";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { getCalApi } from "@calcom/embed-react";
@@ -62,7 +63,16 @@ function getFormattedPrice(eventLimit: number | string, planType: "standard" | "
   };
 }
 
-export function PricingSection({ isAnnual, setIsAnnual }: { isAnnual: boolean, setIsAnnual: (isAnnual: boolean) => void }) {
+export function PricingSection({
+  isAnnual,
+  setIsAnnual,
+  standalone = false,
+}: {
+  isAnnual: boolean;
+  setIsAnnual: (isAnnual: boolean) => void;
+  /** Page-top mode for /pricing: h1 heading plus the marketing pages' plotted-dataline signature. */
+  standalone?: boolean;
+}) {
   const t = useExtracted();
   const [eventLimitIndex, setEventLimitIndex] = useState(0); // Default to 100k (index 0)
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
@@ -146,17 +156,30 @@ export function PricingSection({ isAnnual, setIsAnnual }: { isAnnual: boolean, s
     <section className="relative z-10 border-b border-neutral-200 dark:border-neutral-800">
       <div className="relative mx-auto max-w-[1200px] border-x border-neutral-200 px-5 py-16 dark:border-neutral-800 sm:px-8 md:py-24 lg:px-10">
         <GridCrosses />
-        <div className="mb-14 grid gap-6 lg:grid-cols-12 lg:items-end">
-          <h2 className="text-4xl font-semibold leading-[1.04] tracking-[-0.035em] md:text-5xl lg:col-span-4">
-            {t("Pricing")}
-          </h2>
+        {standalone && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-40 sm:block lg:h-48">
+            <HeroDataLine id="pricing" className="h-40 lg:h-48" />
+          </div>
+        )}
+        <div className="relative mb-14 grid gap-6 lg:grid-cols-12 lg:items-end">
+          {standalone ? (
+            <h1 className="text-5xl font-semibold leading-[0.98] tracking-[-0.035em] md:text-6xl lg:col-span-4">
+              {t("Pricing")}
+            </h1>
+          ) : (
+            <h2 className="text-4xl font-semibold leading-[1.04] tracking-[-0.035em] md:text-5xl lg:col-span-4">
+              {t("Pricing")}
+            </h2>
+          )}
           <p className="max-w-2xl text-lg leading-8 text-neutral-600 dark:text-neutral-400 lg:col-span-8">
             {t("Start your 7-day free trial — no credit card charges until the trial ends.")}
           </p>
         </div>
 
-        {/* Shared controls section */}
-        <div className="mb-10 border-y border-neutral-200 py-8 dark:border-neutral-800">
+        {/* Shared controls section — the quote instrument, set on the same
+            dot-grid mat as the hero demo frame and the agent console. */}
+        <div className="mb-10 rounded-lg border border-neutral-200 bg-neutral-100 p-2 [background-image:radial-gradient(circle,rgba(0,0,0,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:border-neutral-800 dark:bg-neutral-900 dark:[background-image:radial-gradient(circle,rgba(255,255,255,0.07)_1px,transparent_1px)] sm:p-3">
+          <div className="rounded-md border border-neutral-300 bg-white px-5 py-6 dark:border-neutral-700 dark:bg-neutral-950 sm:px-6">
           <div className="mb-7 flex items-end justify-between gap-5">
             <div>
               <h3 className="mb-2 text-sm font-medium text-neutral-600 dark:text-neutral-400">{t("Monthly pageviews")}</h3>
@@ -208,7 +231,14 @@ export function PricingSection({ isAnnual, setIsAnnual }: { isAnnual: boolean, s
 
           <div className="flex justify-between text-xs text-neutral-500 dark:text-neutral-400">
             {EVENT_TIERS.map((tier, index) => (
-              <span key={index} className={cn(eventLimitIndex === index && "font-semibold text-emerald-700 dark:text-emerald-400")}>
+              <span
+                key={index}
+                className={cn(
+                  // 12 tick labels never fit on small screens; the selected value renders large above.
+                  index !== 0 && index !== EVENT_TIERS.length - 1 && "hidden sm:inline",
+                  eventLimitIndex === index && "font-semibold text-emerald-700 dark:text-emerald-400"
+                )}
+              >
                 {index === EVENT_TIERS.length - 1
                   ? "50M+"
                   : typeof tier === "number" && tier >= 1_000_000
@@ -218,6 +248,7 @@ export function PricingSection({ isAnnual, setIsAnnual }: { isAnnual: boolean, s
                       : t("Custom")}
               </span>
             ))}
+          </div>
           </div>
         </div>
 

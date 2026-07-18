@@ -3,6 +3,8 @@
 import { CircleCheckBig, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppLink } from "@/components/AppLink";
+import { GridCrosses } from "@/components/GridCrosses";
+import { SectionKicker } from "@/components/deco/SectionKicker";
 import { STANDARD_SITE_LIMIT, STANDARD_TEAM_LIMIT } from "@/lib/const";
 import { useExtracted } from "next-intl";
 
@@ -235,12 +237,22 @@ export function ComparisonSection({ isAnnual }: { isAnnual: boolean }) {
 
   return (
     <section className="border-b border-neutral-200 dark:border-neutral-800" aria-labelledby="plan-comparison-title">
-      <div className="mx-auto max-w-[1200px] border-x border-neutral-200 dark:border-neutral-800">
-        <div className="border-b border-neutral-200 px-5 py-12 dark:border-neutral-800 sm:px-8 lg:px-10 lg:py-16">
-          <p className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">{t("Plan details")}</p>
-          <h2 id="plan-comparison-title" className="mt-4 text-3xl font-semibold tracking-[-0.03em] md:text-4xl">
-            {t("Compare Plans")}
-          </h2>
+      <div className="relative mx-auto max-w-[1200px] border-x border-neutral-200 dark:border-neutral-800">
+        <GridCrosses />
+        <div className="relative border-b border-neutral-200 bg-plate-accent px-5 py-14 dark:border-neutral-800 sm:px-8 md:py-20 lg:px-10">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-graph-accent [mask-image:linear-gradient(to_bottom,black,transparent_92%)]"
+          />
+          <div className="relative">
+            <SectionKicker>{t("Plan details")}</SectionKicker>
+            <h2
+              id="plan-comparison-title"
+              className="mt-5 max-w-2xl text-4xl font-semibold leading-[1.04] tracking-[-0.035em] md:text-5xl text-balance"
+            >
+              {t("Compare Plans")}
+            </h2>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

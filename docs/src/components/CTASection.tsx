@@ -1,3 +1,4 @@
+import { CtaDataLine } from "@/components/deco/CtaDataLine";
 import { GridCrosses } from "@/components/GridCrosses";
 import { TrackedButton } from "@/components/TrackedButton";
 import { ArrowRight, ExternalLink } from "lucide-react";
@@ -35,6 +36,7 @@ export function CTASection({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:40px_40px] [mask-image:linear-gradient(to_bottom,black,transparent_92%)]"
       />
+      <CtaDataLine className="h-36 lg:h-44" />
       <div className="relative mx-auto grid max-w-[1200px] border-x border-white/10 lg:grid-cols-12">
         <GridCrosses className="text-white/30 dark:text-white/30" />
         <Image
@@ -60,10 +62,13 @@ export function CTASection({
               href={primaryButtonHref}
               eventName="signup"
               eventProps={{ location: eventLocation, button_text: resolvedPrimaryButtonText }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-white px-5 py-2.5 text-sm font-medium text-emerald-950 transition-colors duration-200 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-950"
+              className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-white px-5 py-2.5 text-sm font-medium text-emerald-950 transition-colors duration-200 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-950"
             >
               {resolvedPrimaryButtonText}
-              <ArrowRight className="size-4" aria-hidden="true" />
+              <ArrowRight
+                className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
             </TrackedButton>
             <TrackedButton
               href={secondaryButtonHref}
@@ -71,10 +76,13 @@ export function CTASection({
               target="_blank"
               rel="noopener noreferrer"
               eventProps={{ location: eventLocation, button_text: resolvedSecondaryButtonText }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               {resolvedSecondaryButtonText}
-              <ExternalLink className="size-3.5" aria-hidden="true" />
+              <ExternalLink
+                className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
             </TrackedButton>
           </div>
 

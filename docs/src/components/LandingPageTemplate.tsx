@@ -7,6 +7,7 @@ import { Journeys } from "@/components/Cards/Journeys";
 import { SessionReplay } from "@/components/Cards/SessionReplay";
 import { UserSessions } from "@/components/Cards/UserSessions";
 import { WebVitals } from "@/components/Cards/WebVitals";
+import { CapabilityFeatures } from "@/components/CapabilityFeatures";
 import { GridCrosses } from "@/components/GridCrosses";
 import { SectionKicker } from "@/components/deco/SectionKicker";
 import { TrackingSnippet } from "@/components/deco/TrackingSnippet";
@@ -15,22 +16,6 @@ import { IntegrationsGrid } from "@/components/Integration";
 import { LandingPricing } from "@/components/LandingPricing";
 import { Marquee } from "@/components/magicui/marquee";
 import { TweetCard } from "@/components/Tweet";
-import { ActivityIcon } from "@/components/ui/activity";
-import { ArrowDownIcon } from "@/components/ui/arrow-down";
-import { BanIcon } from "@/components/ui/ban";
-import { BellIcon } from "@/components/ui/bell";
-import { BotIcon } from "@/components/ui/bot";
-import { DownloadIcon } from "@/components/ui/download";
-import { EarthIcon } from "@/components/ui/earth";
-import { GaugeIcon } from "@/components/ui/gauge";
-import { LayersIcon } from "@/components/ui/layers";
-import { LinkIcon } from "@/components/ui/link";
-import { PlayIcon } from "@/components/ui/play";
-import { RouteIcon } from "@/components/ui/route";
-import { ShieldCheckIcon } from "@/components/ui/shield-check";
-import { TerminalIcon } from "@/components/ui/terminal";
-import { UsersIcon } from "@/components/ui/users";
-import { ZapIcon } from "@/components/ui/zap";
 import { ArrowRight } from "lucide-react";
 import { useExtracted } from "next-intl";
 import Image from "next/image";
@@ -144,21 +129,21 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
       iconClassName: "text-emerald-600 dark:text-emerald-400",
       features: [
         {
-          icon: ZapIcon,
+          icon: "zap" as const,
           title: t("Setup in minutes"),
           description: t("Add one line of code and start seeing real-time data instantly."),
         },
         {
-          icon: ActivityIcon,
+          icon: "activity" as const,
           title: t("Realtime data"),
           description: t("See what's happening on your site right now."),
         },
         {
-          icon: GaugeIcon,
+          icon: "gauge" as const,
           title: t("Web vitals"),
           description: t("Monitor Core Web Vitals for fast user experiences."),
         },
-        { icon: BellIcon, title: t("Email reports"), description: t("Automated reports delivered to your inbox.") },
+        { icon: "bell" as const, title: t("Email reports"), description: t("Automated reports delivered to your inbox.") },
       ],
     },
     {
@@ -167,21 +152,21 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
       iconClassName: "text-blue-600 dark:text-blue-400",
       features: [
         {
-          icon: PlayIcon,
+          icon: "play" as const,
           title: t("Session replay"),
           description: t("Watch real user sessions to spot usability issues."),
         },
         {
-          icon: RouteIcon,
+          icon: "route" as const,
           title: t("User journeys"),
           description: t("Map how users navigate from landing to conversion."),
         },
         {
-          icon: EarthIcon,
+          icon: "earth" as const,
           title: t("Globe views"),
           description: t("Watch traffic flow with detailed 3D globe visualizations."),
         },
-        { icon: UsersIcon, title: t("Organizations"), description: t("Manage sites and team access in one place.") },
+        { icon: "users" as const, title: t("Organizations"), description: t("Manage sites and team access in one place.") },
       ],
     },
     {
@@ -190,17 +175,17 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
       iconClassName: "text-amber-700 dark:text-amber-400",
       features: [
         {
-          icon: ArrowDownIcon,
+          icon: "arrow-down" as const,
           title: t("Funnels"),
           description: t("Visualize conversion paths and find where visitors drop off."),
         },
         {
-          icon: LayersIcon,
+          icon: "layers" as const,
           title: t("Custom events"),
           description: t("Track sign-ups, purchases, and any user interaction."),
         },
-        { icon: LinkIcon, title: t("API"), description: t("Full API access to build custom integrations.") },
-        { icon: DownloadIcon, title: t("Data export"), description: t("Export your raw data anytime. No lock-in.") },
+        { icon: "link" as const, title: t("API"), description: t("Full API access to build custom integrations.") },
+        { icon: "download" as const, title: t("Data export"), description: t("Export your raw data anytime. No lock-in.") },
       ],
     },
     {
@@ -209,22 +194,22 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
       iconClassName: "text-violet-600 dark:text-violet-400",
       features: [
         {
-          icon: BotIcon,
+          icon: "bot" as const,
           title: t("Bot blocking"),
           description: t("Automatically filter out bots to keep data clean."),
         },
         {
-          icon: BanIcon,
+          icon: "ban" as const,
           title: t("No cookies"),
           description: t("Zero cookies, zero banners. Cleaner visitor experiences."),
         },
         {
-          icon: ShieldCheckIcon,
+          icon: "shield-check" as const,
           title: t("GDPR & CCPA"),
           description: t("Privacy-first design means you're compliant out of the box."),
         },
         {
-          icon: TerminalIcon,
+          icon: "terminal" as const,
           title: t("Open source"),
           description: t("100% open source. Self-host or use our cloud."),
         },
@@ -307,22 +292,7 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
                   <p className="mt-2 min-h-12 max-w-md text-sm leading-6 text-neutral-600 dark:text-neutral-400">
                     {group.description}
                   </p>
-                  <div className="mt-8 divide-y divide-neutral-200 border-t border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
-                    {group.features.map(feature => {
-                      const Icon = feature.icon;
-                      return (
-                        <div key={feature.title} className="grid grid-cols-[24px_1fr] gap-x-3 py-4">
-                          <Icon size={18} className={`mt-0.5 ${group.iconClassName}`} />
-                          <div>
-                            <h4 className="text-sm font-medium">{feature.title}</h4>
-                            <p className="mt-1 text-sm leading-5 text-neutral-600 dark:text-neutral-400">
-                              {feature.description}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <CapabilityFeatures features={group.features} iconClassName={group.iconClassName} />
                 </article>
               ))}
             </div>
@@ -414,17 +384,23 @@ export function LandingPageTemplate({ title, subtitle, showEUFlag = true }: Land
                 <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
                   <Link
                     href="/docs/mcp"
-                    className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-emerald-700 transition-colors duration-200 hover:text-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-emerald-400 dark:hover:text-emerald-300 dark:focus-visible:ring-offset-neutral-950"
+                    className="group inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-emerald-700 transition-colors duration-200 hover:text-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-emerald-400 dark:hover:text-emerald-300 dark:focus-visible:ring-offset-neutral-950"
                   >
                     {t("Set up MCP")}
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                    <ArrowRight
+                      className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                      aria-hidden="true"
+                    />
                   </Link>
                   <Link
                     href="/docs/api/getting-started"
-                    className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-neutral-600 transition-colors duration-200 hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-neutral-400 dark:hover:text-white dark:focus-visible:ring-offset-neutral-950"
+                    className="group inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-neutral-600 transition-colors duration-200 hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-neutral-400 dark:hover:text-white dark:focus-visible:ring-offset-neutral-950"
                   >
                     {t("API reference")}
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                    <ArrowRight
+                      className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                      aria-hidden="true"
+                    />
                   </Link>
                 </div>
               </div>
