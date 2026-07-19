@@ -42,9 +42,29 @@ export const user = pgTable(
     // deprecated
     monthlyEventCount: integer().default(0),
     sendAutoEmailReports: boolean().default(true),
+    twoFactorEnabled: boolean().default(false),
     scheduledTipEmailIds: jsonb("scheduled_tip_email_ids").$type<string[]>().default([]),
   },
   table => [unique("user_username_unique").on(table.username), unique("user_email_unique").on(table.email)]
+);
+
+// Better Auth TOTP and backup-code state. Secrets and backup codes are
+// encrypted by Better Auth with BETTER_AUTH_SECRET before they reach this
+// table and are never returned through the session model.
+export const twoFactor = pgTable(
+  "twoFactor",
+  {
+    id: text().primaryKey().notNull(),
+    secret: text().notNull(),
+    backupCodes: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean().default(false).notNull(),
+    failedVerificationCount: integer().default(0).notNull(),
+    lockedUntil: timestamp({ mode: "string" }),
+  },
+  table => [unique("twoFactor_userId_unique").on(table.userId), index("twoFactor_secret_idx").on(table.secret)]
 );
 
 // Verification table (BetterAuth)
@@ -221,7 +241,7 @@ export const memberSiteAccess = pgTable(
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
   },
-  (table) => [
+  table => [
     unique("member_site_access_unique").on(table.memberId, table.siteId),
     index("member_site_access_member_idx").on(table.memberId),
     index("member_site_access_site_idx").on(table.siteId),
@@ -232,7 +252,9 @@ export const memberSiteAccess = pgTable(
 export const team = pgTable("team", {
   id: text().primaryKey(),
   name: text().notNull(),
-  organizationId: text().notNull().references(() => organization.id, { onDelete: "cascade" }),
+  organizationId: text()
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
   createdAt: timestamp({ mode: "string" }).notNull(),
   updatedAt: timestamp({ mode: "string" }),
 });
@@ -240,8 +262,12 @@ export const team = pgTable("team", {
 // Team member table (BetterAuth)
 export const teamMember = pgTable("teamMember", {
   id: text().primaryKey(),
-  teamId: text().notNull().references(() => team.id, { onDelete: "cascade" }),
-  userId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  teamId: text()
+    .notNull()
+    .references(() => team.id, { onDelete: "cascade" }),
+  userId: text()
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   createdAt: timestamp({ mode: "string" }),
 });
 
@@ -258,10 +284,165 @@ export const teamSiteAccess = pgTable(
       .references(() => sites.siteId, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
   },
-  (table) => [
+  table => [
     unique("team_site_access_unique").on(table.teamId, table.siteId),
     index("team_site_access_team_idx").on(table.teamId),
     index("team_site_access_site_idx").on(table.siteId),
+  ]
+);
+
+// Agency layer. A client owns one Better Auth team, while team/member site
+// access remains the authorization source of truth.
+export const agencyClients = pgTable(
+  "agency_clients",
+  {
+    id: text("id").primaryKey().notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => team.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    status: text("status").notNull().default("onboarding"),
+    logoUrl: text("logo_url"),
+    timezone: text("timezone").notNull().default("UTC"),
+    externalRef: text("external_ref"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    unique("agency_clients_org_slug_unique").on(table.organizationId, table.slug),
+    unique("agency_clients_team_unique").on(table.teamId),
+    index("agency_clients_org_idx").on(table.organizationId),
+    check("agency_clients_status_check", sql`${table.status} IN ('onboarding', 'active', 'paused', 'archived')`),
+  ]
+);
+
+export const agencyClientSites = pgTable(
+  "agency_client_sites",
+  {
+    id: serial("id").primaryKey().notNull(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => agencyClients.id, { onDelete: "cascade" }),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    trackingMethod: text("tracking_method").notNull().default("script"),
+    trackingStatus: text("tracking_status").notNull().default("pending"),
+    verifiedAt: timestamp("verified_at", { mode: "string" }),
+    lastCheckedAt: timestamp("last_checked_at", { mode: "string" }),
+  },
+  table => [
+    unique("agency_client_sites_site_unique").on(table.siteId),
+    unique("agency_client_sites_client_site_unique").on(table.clientId, table.siteId),
+    index("agency_client_sites_client_idx").on(table.clientId),
+    check("agency_client_sites_method_check", sql`${table.trackingMethod} IN ('script', 'gtm', 'cms', 'proxy')`),
+    check(
+      "agency_client_sites_status_check",
+      sql`${table.trackingStatus} IN ('pending', 'verified', 'stale', 'error')`
+    ),
+  ]
+);
+
+export const reportSchedules = pgTable(
+  "report_schedules",
+  {
+    id: text("id").primaryKey().notNull(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => agencyClients.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    cadence: text("cadence").notNull(),
+    timezone: text("timezone").notNull().default("UTC"),
+    weekday: integer("weekday"),
+    dayOfMonth: integer("day_of_month"),
+    sendHour: integer("send_hour").notNull().default(8),
+    siteScope: jsonb("site_scope").$type<number[]>().notNull().default([]),
+    enabled: boolean("enabled").notNull().default(true),
+    nextRunAt: timestamp("next_run_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    index("report_schedules_client_idx").on(table.clientId),
+    index("report_schedules_next_run_idx").on(table.nextRunAt),
+    check("report_schedules_cadence_check", sql`${table.cadence} IN ('weekly', 'monthly')`),
+    check("report_schedules_weekday_check", sql`${table.weekday} IS NULL OR (${table.weekday} BETWEEN 0 AND 6)`),
+    check("report_schedules_day_check", sql`${table.dayOfMonth} IS NULL OR (${table.dayOfMonth} BETWEEN 1 AND 28)`),
+    check("report_schedules_hour_check", sql`${table.sendHour} BETWEEN 0 AND 23`),
+  ]
+);
+
+export const reportRecipients = pgTable(
+  "report_recipients",
+  {
+    id: text("id").primaryKey().notNull(),
+    scheduleId: text("schedule_id")
+      .notNull()
+      .references(() => reportSchedules.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    locale: text("locale").notNull().default("en"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    unique("report_recipients_schedule_email_unique").on(table.scheduleId, table.email),
+    index("report_recipients_schedule_idx").on(table.scheduleId),
+  ]
+);
+
+export const reportRuns = pgTable(
+  "report_runs",
+  {
+    id: text("id").primaryKey().notNull(),
+    scheduleId: text("schedule_id")
+      .notNull()
+      .references(() => reportSchedules.id, { onDelete: "cascade" }),
+    windowStart: timestamp("window_start", { mode: "string" }).notNull(),
+    windowEnd: timestamp("window_end", { mode: "string" }).notNull(),
+    status: text("status").notNull().default("queued"),
+    summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default({}),
+    artifactKey: text("artifact_key"),
+    attempts: integer("attempts").notNull().default(0),
+    errorSummary: text("error_summary"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    startedAt: timestamp("started_at", { mode: "string" }),
+    completedAt: timestamp("completed_at", { mode: "string" }),
+  },
+  table => [
+    unique("report_runs_schedule_window_unique").on(table.scheduleId, table.windowStart, table.windowEnd),
+    index("report_runs_schedule_idx").on(table.scheduleId),
+    index("report_runs_status_idx").on(table.status),
+    check("report_runs_status_check", sql`${table.status} IN ('queued', 'running', 'succeeded', 'failed')`),
+    check("report_runs_window_check", sql`${table.windowEnd} > ${table.windowStart}`),
+    check("report_runs_attempts_check", sql`${table.attempts} >= 0`),
+  ]
+);
+
+export const agencyAuditEvents = pgTable(
+  "agency_audit_events",
+  {
+    id: serial("id").primaryKey().notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: text("client_id").references(() => agencyClients.id, { onDelete: "set null" }),
+    actorUserId: text("actor_user_id").references(() => user.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    index("agency_audit_events_org_created_idx").on(table.organizationId, table.createdAt),
+    index("agency_audit_events_client_idx").on(table.clientId),
   ]
 );
 
@@ -561,35 +742,35 @@ export const uptimeMonitors = pgTable("uptime_monitors", {
   validationRules: jsonb("validation_rules").notNull().default([]).$type<
     Array<
       | {
-        type: "status_code";
-        operator: "equals" | "not_equals" | "in" | "not_in";
-        value: number | number[];
-      }
+          type: "status_code";
+          operator: "equals" | "not_equals" | "in" | "not_in";
+          value: number | number[];
+        }
       | {
-        type: "response_time";
-        operator: "less_than" | "greater_than";
-        value: number;
-      }
+          type: "response_time";
+          operator: "less_than" | "greater_than";
+          value: number;
+        }
       | {
-        type: "response_body_contains" | "response_body_not_contains";
-        value: string;
-        caseSensitive?: boolean;
-      }
+          type: "response_body_contains" | "response_body_not_contains";
+          value: string;
+          caseSensitive?: boolean;
+        }
       | {
-        type: "header_exists";
-        header: string;
-      }
+          type: "header_exists";
+          header: string;
+        }
       | {
-        type: "header_value";
-        header: string;
-        operator: "equals" | "contains";
-        value: string;
-      }
+          type: "header_value";
+          header: string;
+          operator: "equals" | "contains";
+          value: string;
+        }
       | {
-        type: "response_size";
-        operator: "less_than" | "greater_than";
-        value: number;
-      }
+          type: "response_size";
+          operator: "less_than" | "greater_than";
+          value: number;
+        }
     >
   >(),
 
@@ -805,10 +986,7 @@ export const userProfiles = pgTable(
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.siteId, table.userId] }),
-    index("user_profiles_site_idx").on(table.siteId),
-  ]
+  table => [primaryKey({ columns: [table.siteId, table.userId] }), index("user_profiles_site_idx").on(table.siteId)]
 );
 
 // User aliases - maps anonymous IDs to identified users (multi-device support)
@@ -823,7 +1001,7 @@ export const userAliases = pgTable(
     userId: text("user_id").notNull(), // The identified user ID
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
   },
-  (table) => [
+  table => [
     unique("user_aliases_site_anon_unique").on(table.siteId, table.anonymousId),
     index("user_aliases_user_idx").on(table.siteId, table.userId),
     index("user_aliases_anon_idx").on(table.siteId, table.anonymousId),
@@ -867,7 +1045,7 @@ export const importStatus = pgTable(
       columns: [table.siteId],
       foreignColumns: [sites.siteId],
       name: "import_status_site_id_sites_site_id_fk",
-    }),
+    }).onDelete("cascade"),
     foreignKey({
       columns: [table.organizationId],
       foreignColumns: [organization.id],

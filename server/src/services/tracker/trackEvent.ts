@@ -249,16 +249,19 @@ export const trackingPayloadSchema = z.discriminatedUnion("type", [
 
 const logger = createServiceLogger("track-event");
 
-async function isTrustedServerSideIngestion(request: FastifyRequest, siteId: number): Promise<boolean> {
+async function resolveServerSideIngestion(request: FastifyRequest, siteId: number) {
   const authHeader = request.headers["authorization"];
   if (typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
-    return false;
+    return { trusted: false, rateLimited: false };
   }
 
   // An under-scoped bearer degrades to untrusted client-side traffic (no 4xx)
   // — this is a public ingestion endpoint, not an authenticated API.
   const apiKeyResult = await checkApiKey(request, { siteId });
-  return apiKeyResult.valid && hasScope(apiKeyResult.statements, { resource: "ingest", action: "write" });
+  return {
+    trusted: apiKeyResult.valid && hasScope(apiKeyResult.statements, { resource: "ingest", action: "write" }),
+    rateLimited: !!apiKeyResult.rateLimited,
+  };
 }
 
 // Unified handler for all events (pageviews and custom events)
@@ -288,7 +291,11 @@ export async function trackEvent(request: FastifyRequest, reply: FastifyReply) {
       });
     }
 
-    const trustedServerSideIngestion = await isTrustedServerSideIngestion(request, siteConfiguration.siteId);
+    const ingestionAuth = await resolveServerSideIngestion(request, siteConfiguration.siteId);
+    if (ingestionAuth.rateLimited) {
+      return reply.status(429).send({ success: false, error: "Rate limit exceeded" });
+    }
+    const trustedServerSideIngestion = ingestionAuth.trusted;
     const trackingIdentity = resolveTrackingIdentity(request, validatedPayload, trustedServerSideIngestion);
     const requestIP = trackingIdentity.ipAddress;
 

@@ -15,6 +15,25 @@ import {
   getClickhouseQueryLog,
 } from "./api/admin/index.js";
 import {
+  assignAgencyClientSite,
+  createAgencyClient,
+  createReportSchedule,
+  deleteReportSchedule,
+  getReportRunDownload,
+  getAgencyClient,
+  getAgencyClientOnboarding,
+  getAgencyClientSummary,
+  listAgencyClients,
+  listReportRuns,
+  listReportSchedules,
+  removeAgencyClientSite,
+  retryReportRun,
+  updateAgencyClient,
+  updateReportSchedule,
+  verifyAgencyClientSite,
+} from "./api/agency/index.js";
+import { agencyReportService } from "./services/agencyReports/reportService.js";
+import {
   createDashboard,
   createFunnel,
   createGoal,
@@ -498,6 +517,53 @@ async function teamsRoutes(fastify: FastifyInstance) {
   fastify.delete("/organizations/:organizationId/teams/:teamId", orgAdminOrgWrite, deleteTeam);
 }
 
+async function agencyRoutes(fastify: FastifyInstance) {
+  fastify.get("/organizations/:organizationId/clients", orgOrgRead, listAgencyClients);
+  fastify.post("/organizations/:organizationId/clients", orgAdminOrgWrite, createAgencyClient);
+  fastify.get("/organizations/:organizationId/clients/:clientId", orgOrgRead, getAgencyClient);
+  fastify.patch("/organizations/:organizationId/clients/:clientId", orgAdminOrgWrite, updateAgencyClient);
+  fastify.post("/organizations/:organizationId/clients/:clientId/sites", orgAdminOrgWrite, assignAgencyClientSite);
+  fastify.delete(
+    "/organizations/:organizationId/clients/:clientId/sites/:siteId",
+    orgAdminOrgWrite,
+    removeAgencyClientSite
+  );
+  fastify.post(
+    "/organizations/:organizationId/clients/:clientId/sites/:siteId/verify",
+    orgAdminOrgWrite,
+    verifyAgencyClientSite
+  );
+  fastify.get("/organizations/:organizationId/clients/:clientId/onboarding", orgOrgRead, getAgencyClientOnboarding);
+  fastify.get("/organizations/:organizationId/clients/:clientId/summary", orgOrgRead, getAgencyClientSummary);
+  fastify.get("/organizations/:organizationId/clients/:clientId/report-schedules", orgOrgRead, listReportSchedules);
+  fastify.post(
+    "/organizations/:organizationId/clients/:clientId/report-schedules",
+    orgAdminOrgWrite,
+    createReportSchedule
+  );
+  fastify.patch(
+    "/organizations/:organizationId/clients/:clientId/report-schedules/:scheduleId",
+    orgAdminOrgWrite,
+    updateReportSchedule
+  );
+  fastify.delete(
+    "/organizations/:organizationId/clients/:clientId/report-schedules/:scheduleId",
+    orgAdminOrgWrite,
+    deleteReportSchedule
+  );
+  fastify.get("/organizations/:organizationId/clients/:clientId/report-runs", orgOrgRead, listReportRuns);
+  fastify.get(
+    "/organizations/:organizationId/clients/:clientId/report-runs/:runId/download",
+    orgOrgRead,
+    getReportRunDownload
+  );
+  fastify.post(
+    "/organizations/:organizationId/clients/:clientId/report-runs/:runId/retry",
+    orgAdminOrgWrite,
+    retryReportRun
+  );
+}
+
 async function userRoutes(fastify: FastifyInstance) {
   // User
   fastify.get("/config", getConfig); // Public - returns app config
@@ -556,6 +622,7 @@ async function apiRoutes(fastify: FastifyInstance) {
   await fastify.register(sitesRoutes);
   await fastify.register(organizationsRoutes);
   await fastify.register(teamsRoutes);
+  await fastify.register(agencyRoutes);
   await fastify.register(userRoutes);
   await fastify.register(gscRoutes);
   await fastify.register(stripeAdminRoutes);
@@ -582,6 +649,7 @@ const start = async () => {
     if (!cluster.isWorker) {
       telemetryService.startTelemetryCron();
       usageService.startUsageCheckCron();
+      await agencyReportService.initialize();
       if (IS_CLOUD && process.env.NODE_ENV !== "development") {
         weeklyReportService.startWeeklyReportCron();
         reengagementService.startReengagementCron();
@@ -647,6 +715,8 @@ const shutdown = async (signal: string) => {
     // Stop accepting new connections
     await server.close();
     server.log.info("Server closed");
+
+    await agencyReportService.shutdown();
 
     // Shutdown uptime service
     // await uptimeService.shutdown();

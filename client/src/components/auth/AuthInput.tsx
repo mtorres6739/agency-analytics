@@ -14,6 +14,8 @@ interface AuthInputProps {
   required?: boolean;
   className?: string;
   rightElement?: ReactNode;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  autoComplete?: string;
 }
 
 export function AuthInput({
@@ -26,6 +28,8 @@ export function AuthInput({
   required = false,
   className = "",
   rightElement,
+  inputMode,
+  autoComplete,
 }: AuthInputProps) {
   return (
     <div className={`grid gap-2 ${className}`}>
@@ -41,6 +45,8 @@ export function AuthInput({
         onChange={onChange}
         required={required}
         minLength={type === "password" ? 8 : undefined}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
       />
     </div>
   );

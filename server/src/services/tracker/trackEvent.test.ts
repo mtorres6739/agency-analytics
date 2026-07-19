@@ -54,6 +54,7 @@ vi.mock("./utils.js", () => ({
 }));
 
 import { trackEvent } from "./trackEvent.js";
+import { checkApiKey } from "../../lib/auth-utils.js";
 
 const siteConfiguration = {
   id: "site_abc",
@@ -118,5 +119,27 @@ describe("trackEvent session identity", () => {
         identifiedUserId: "employee-alice",
       })
     );
+  });
+
+  it("returns 429 when a supplied ingestion key is rate limited", async () => {
+    vi.mocked(checkApiKey).mockResolvedValue({
+      valid: false,
+      role: null,
+      rateLimited: true,
+      statements: null,
+    });
+    const request = {
+      body: { type: "pageview", site_id: "site_abc" },
+      headers: { authorization: "Bearer rb_rate_limited" },
+      ip: "198.51.100.10",
+    } as unknown as FastifyRequest;
+    const reply = replyStub();
+
+    await trackEvent(request, reply);
+
+    expect(reply.status).toHaveBeenCalledWith(429);
+    expect(reply.send).toHaveBeenCalledWith({ success: false, error: "Rate limit exceeded" });
+    expect(mocks.checkBotBlocking).not.toHaveBeenCalled();
+    expect(mocks.addPageview).not.toHaveBeenCalled();
   });
 });

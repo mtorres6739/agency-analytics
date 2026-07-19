@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { admin, captcha, emailOTP, mcp, organization } from "better-auth/plugins";
+import { admin, captcha, emailOTP, mcp, organization, twoFactor } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements, memberAc, ownerAc } from "better-auth/plugins/organization/access";
 import { ALL_SCOPE_STRINGS, OIDC_STANDARD_SCOPES } from "./scopes.js";
@@ -8,7 +8,7 @@ import dotenv from "dotenv";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import pg from "pg";
 import { dash } from "@better-auth/infra";
-import { apiKey } from "@better-auth/api-key"
+import { apiKey } from "@better-auth/api-key";
 
 import { db } from "../db/postgres/postgres.js";
 import * as schema from "../db/postgres/schema.js";
@@ -59,6 +59,16 @@ const apiKeyRateLimit = IS_CLOUD
 
 const pluginList = [
   admin(),
+  twoFactor({
+    issuer: process.env.APP_NAME || "Bold Analytics",
+    allowPasswordless: true,
+    trustDeviceMaxAge: 60 * 60 * 24 * 30,
+    accountLockout: {
+      enabled: true,
+      maxFailedAttempts: 5,
+      durationSeconds: 15 * 60,
+    },
+  }),
   // OAuth provider for MCP clients (RFC 8414/9728 discovery, dynamic client
   // registration, authorization-code + PKCE). The root /.well-known routes are
   // registered in index.ts; token validation happens via auth.api.getMcpSession.
@@ -243,17 +253,17 @@ const pluginList = [
   // Add Cloudflare Turnstile captcha (cloud only)
   ...(IS_CLOUD && process.env.TURNSTILE_SECRET_KEY && process.env.NODE_ENV === "production"
     ? [
-      captcha({
-        provider: "cloudflare-turnstile",
-        secretKey: process.env.TURNSTILE_SECRET_KEY,
-      }),
-    ]
+        captcha({
+          provider: "cloudflare-turnstile",
+          secretKey: process.env.TURNSTILE_SECRET_KEY,
+        }),
+      ]
     : []),
 ];
 
 export const auth = betterAuth({
   basePath: "/api/auth",
-  appName: "Rybbit",
+  appName: process.env.APP_NAME || "Bold Analytics",
   logger: {
     log: (level, message, ...args) => {
       // Route better-auth's internal logs (e.g. API key rate-limit errors)
@@ -275,14 +285,7 @@ export const auth = betterAuth({
     disableSignUp: DISABLE_SIGNUP,
   },
   emailVerification: {
-    sendVerificationEmail: async ({
-      user,
-      url,
-    }: {
-      user: { email: string };
-      url: string;
-      token: string;
-    }) => {
+    sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string; token: string }) => {
       await sendEmailVerificationLink(user.email, url);
     },
   },
@@ -399,7 +402,7 @@ export const auth = betterAuth({
     },
   },
   hooks: {
-    before: createAuthMiddleware(async (ctx) => {
+    before: createAuthMiddleware(async ctx => {
       // Gate API key creation on better-auth's own /api-key/create route. This
       // is the only choke point that covers direct client calls — the Fastify
       // endpoints (createUserApiKey / createOrgApiKey) do richer plan checks

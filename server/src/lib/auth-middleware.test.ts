@@ -9,11 +9,12 @@ const mocks = vi.hoisted(() => ({
   getUserHasAccessToSitePublic: vi.fn(),
   getUserIsInOrg: vi.fn(),
   getIsUserAdmin: vi.fn(),
+  findMember: vi.fn(),
 }));
 
 vi.mock("./auth-utils.js", () => mocks);
 vi.mock("../db/postgres/postgres.js", () => ({
-  db: { query: { member: { findFirst: vi.fn(async () => null) } } },
+  db: { query: { member: { findFirst: mocks.findMember } } },
 }));
 vi.mock("../utils.js", () => ({ resolveNumericSiteId: vi.fn(async () => null) }));
 
@@ -46,6 +47,8 @@ describe("auth middleware scope enforcement", () => {
     mocks.getUserHasAccessToSitePublic.mockResolvedValue(false);
     mocks.getUserIsInOrg.mockResolvedValue(false);
     mocks.checkApiKey.mockResolvedValue(invalidResult);
+    mocks.findMember.mockResolvedValue(null);
+    delete process.env.ENFORCE_AGENCY_TWO_FACTOR;
 
     app = Fastify();
     app.get(
@@ -114,6 +117,30 @@ describe("auth middleware scope enforcement", () => {
     const response = await app.inject({ method: "POST", url: "/sites/5/goals" });
 
     expect(response.statusCode).toBe(200);
+  });
+
+  it("requires TOTP for privileged sessions when production enforcement is enabled", async () => {
+    process.env.ENFORCE_AGENCY_TWO_FACTOR = "true";
+    mocks.getUserHasAccessToSite.mockResolvedValue(true);
+    mocks.getSessionFromReq.mockResolvedValue({ user: { id: "owner", twoFactorEnabled: false } });
+    mocks.findMember.mockResolvedValue({ role: "owner" });
+
+    const response = await app.inject({ method: "GET", url: "/sites/5/goals" });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "Two-factor authentication is required for agency owners and administrators",
+      code: "TWO_FACTOR_REQUIRED",
+    });
+  });
+
+  it("does not require TOTP from restricted client viewers", async () => {
+    process.env.ENFORCE_AGENCY_TWO_FACTOR = "true";
+    mocks.getUserHasAccessToSite.mockResolvedValue(true);
+    mocks.getSessionFromReq.mockResolvedValue({ user: { id: "viewer", twoFactorEnabled: false } });
+    mocks.findMember.mockResolvedValue(null);
+
+    expect((await app.inject({ method: "GET", url: "/sites/5/goals" })).statusCode).toBe(200);
   });
 
   it("falls through to session access when the bearer scope is insufficient", async () => {

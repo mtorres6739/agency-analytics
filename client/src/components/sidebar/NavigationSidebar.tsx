@@ -1,5 +1,5 @@
 "use client";
-import { AppWindow, Building2, Combine, CreditCard, UserCircle, Users } from "lucide-react";
+import { AppWindow, BarChart3, Building2, Combine, CreditCard, FileText, UserCircle, Users } from "lucide-react";
 import { useExtracted } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useUserOrganizations } from "../../api/admin/hooks/useOrganizations";
@@ -14,11 +14,8 @@ export function NavigationSidebar() {
   const { data: activeOrganization } = authClient.useActiveOrganization();
   const { data: userOrganizations } = useUserOrganizations();
 
-  const currentMember = userOrganizations?.find(
-    (org) => org.id === activeOrganization?.id
-  );
-  const isAdminOrOwner =
-    currentMember?.role === "admin" || currentMember?.role === "owner";
+  const currentMember = userOrganizations?.find(org => org.id === activeOrganization?.id);
+  const isAdminOrOwner = currentMember?.role === "admin" || currentMember?.role === "owner";
 
   return (
     <Sidebar.Root>
@@ -26,6 +23,24 @@ export function NavigationSidebar() {
         <OrganizationSelector />
       </div>
       <Sidebar.Items>
+        <Sidebar.Item
+          label={t("Portfolio")}
+          active={pathname.startsWith("/portfolio")}
+          href="/portfolio"
+          icon={<BarChart3 className="w-4 h-4" />}
+        />
+        <Sidebar.Item
+          label={t("Clients")}
+          active={pathname.startsWith("/clients")}
+          href="/clients"
+          icon={<Building2 className="w-4 h-4" />}
+        />
+        <Sidebar.Item
+          label={t("Reports")}
+          active={pathname === "/reports"}
+          href="/reports"
+          icon={<FileText className="w-4 h-4" />}
+        />
         <Sidebar.Item
           label={t("Properties")}
           active={pathname === "/"}

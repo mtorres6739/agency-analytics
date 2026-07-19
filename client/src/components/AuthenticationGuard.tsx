@@ -5,7 +5,7 @@ import { redirect, usePathname } from "next/navigation";
 import { userStore } from "../lib/userStore";
 import { useGetSiteIsPublic } from "../api/admin/hooks/useSites";
 
-const PUBLIC_ROUTES = ["/login", "/signup", "/invitation", "/reset-password", "/as/callback"];
+const PUBLIC_ROUTES = ["/login", "/two-factor", "/signup", "/invitation", "/reset-password", "/as/callback"];
 
 export function AuthenticationGuard() {
   const { user, isPending } = userStore();

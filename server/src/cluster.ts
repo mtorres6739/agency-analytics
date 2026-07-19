@@ -8,6 +8,7 @@ import { sessionsService } from "./services/sessions/sessionsService.js";
 import { telemetryService } from "./services/telemetryService.js";
 import { usageService } from "./services/usageService.js";
 import { weeklyReportService } from "./services/weekyReports/weeklyReportService.js";
+import { agencyReportService } from "./services/agencyReports/reportService.js";
 
 const logger = createServiceLogger("cluster");
 
@@ -45,6 +46,7 @@ if (workerCount === 0) {
   // Start cron jobs on the primary process only
   telemetryService.startTelemetryCron();
   usageService.startUsageCheckCron();
+  await agencyReportService.initialize();
   if (IS_CLOUD && process.env.NODE_ENV !== "development") {
     weeklyReportService.startWeeklyReportCron();
     reengagementService.startReengagementCron();
@@ -117,6 +119,7 @@ if (workerCount === 0) {
     usageService.stopUsageCheckCron();
     void sessionsService.close();
     telemetryService.stopTelemetryCron();
+    await agencyReportService.shutdown();
     if (IS_CLOUD) {
       weeklyReportService.stopWeeklyReportCron();
       reengagementService.stopReengagementCron();

@@ -133,6 +133,13 @@ export async function authedFetch<T>(
 
     return response.data;
   } catch (error: any) {
+    if (
+      error?.response?.data?.code === "TWO_FACTOR_REQUIRED" &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/settings/account")
+    ) {
+      window.location.assign("/settings/account?setup2fa=1");
+    }
     if (error?.response?.data?.error) {
       throw new Error(error.response.data.error);
     }

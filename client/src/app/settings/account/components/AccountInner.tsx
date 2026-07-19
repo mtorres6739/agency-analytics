@@ -18,6 +18,7 @@ import { ChangePassword } from "./ChangePassword";
 import { DeleteAccount } from "./DeleteAccount";
 import { LanguageSwitcher } from "../../../../components/LanguageSwitcher";
 import { useSignout } from "../../../../hooks/useSignout";
+import { TwoFactorSettings } from "./TwoFactorSettings";
 
 export function AccountInner() {
   const session = authClient.useSession();
@@ -121,6 +122,8 @@ export function AccountInner() {
           <CardTitle className="text-xl">{t("Account")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          <TwoFactorSettings />
+          <div className="border-t border-neutral-200 dark:border-neutral-800" />
           <div className="space-y-2">
             <h4 className="text-sm font-medium">{t("Name")}</h4>
             <p className="text-xs text-neutral-500">{t("Update your name displayed across the platform")}</p>
@@ -159,7 +162,9 @@ export function AccountInner() {
             <div className="flex items-center justify-between">
               <div className="space-y-2">
                 <h4 className="text-sm font-medium">{t("Send Weekly Email Reports")}</h4>
-                <p className="text-xs text-neutral-500">{t("Enable or disable automatic email reports for your account.")}</p>
+                <p className="text-xs text-neutral-500">
+                  {t("Enable or disable automatic email reports for your account.")}
+                </p>
               </div>
               <div className="flex space-x-2">
                 <Switch

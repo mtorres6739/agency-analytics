@@ -1,6 +1,5 @@
 import { Resend } from "resend";
 import { render } from "@react-email/components";
-import { IS_CLOUD } from "../const.js";
 import { ApproachingLimitEmail } from "./templates/ApproachingLimitEmail.js";
 import { InvitationEmail } from "./templates/InvitationEmail.js";
 import { LimitExceededEmail } from "./templates/LimitExceededEmail.js";
@@ -15,7 +14,7 @@ import type { ReengagementContent } from "../../services/reengagement/reengageme
 let resend: Resend | undefined;
 let marketingAudienceId: string | null = null;
 
-if (IS_CLOUD) {
+if (process.env.RESEND_API_KEY) {
   resend = new Resend(process.env.RESEND_API_KEY);
 }
 
@@ -81,7 +80,7 @@ export const sendEmail = async (email: string, subject: string, html: string) =>
   }
   try {
     const response = await resend.emails.send({
-      from: "Rybbit <automail@email.rybbit.com>",
+      from: process.env.EMAIL_FROM || "Bold Analytics <analytics@revamark.app>",
       to: email,
       subject,
       html,
@@ -120,11 +119,7 @@ export const sendEmailVerificationLink = async (email: string, verificationUrl: 
   await sendEmail(email, "Verify your Rybbit email", html);
 };
 
-export const sendChangeEmailVerification = async (
-  currentEmail: string,
-  newEmail: string,
-  verificationUrl: string
-) => {
+export const sendChangeEmailVerification = async (currentEmail: string, newEmail: string, verificationUrl: string) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
       <h2 style="margin: 0 0 16px;">Confirm your new email</h2>

@@ -41,6 +41,20 @@ const sendInsufficientScope = (reply: FastifyReply, scope: RouteScope) =>
     ...(scope === "deny-scoped" ? {} : { required: scopeToString(scope) }),
   });
 
+const requirePrivilegedTwoFactor = async (sessionUser: Record<string, unknown>, reply: FastifyReply) => {
+  if (process.env.ENFORCE_AGENCY_TWO_FACTOR !== "true" || sessionUser.twoFactorEnabled === true) return true;
+  const privilegedMembership = await db.query.member.findFirst({
+    where: (member, { and, eq, inArray }) =>
+      and(eq(member.userId, String(sessionUser.id)), inArray(member.role, ["owner", "admin"])),
+  });
+  if (!privilegedMembership) return true;
+  reply.status(403).send({
+    error: "Two-factor authentication is required for agency owners and administrators",
+    code: "TWO_FACTOR_REQUIRED",
+  });
+  return false;
+};
+
 const getSiteIdFromParams = (request: FastifyRequest): string | undefined => {
   const params = request.params as Record<string, string> | undefined;
   return params?.siteId;
@@ -87,6 +101,7 @@ export function requireAuth(scope?: RouteScope): AuthMiddleware {
   return async (request, reply) => {
     const session = await getSessionFromReq(request);
     if (session?.user) {
+      if (!(await requirePrivilegedTwoFactor(session.user, reply))) return;
       request.user = session.user;
       return;
     }
@@ -120,7 +135,10 @@ export const requireAdmin: AuthMiddleware = async (request, reply) => {
     return reply.status(401).send({ error: "Unauthorized" });
   }
   const session = await getSessionFromReq(request);
-  if (session?.user) request.user = session.user;
+  if (session?.user) {
+    if (!(await requirePrivilegedTwoFactor(session.user, reply))) return;
+    request.user = session.user;
+  }
 };
 
 /**
@@ -148,7 +166,10 @@ export function requireSiteAccess(scope?: RouteScope): AuthMiddleware {
     const hasAccess = await getUserHasAccessToSite(request, siteId);
     if (hasAccess) {
       const session = await getSessionFromReq(request);
-      if (session?.user) request.user = session.user;
+      if (session?.user) {
+        if (!(await requirePrivilegedTwoFactor(session.user, reply))) return;
+        request.user = session.user;
+      }
       return;
     }
 
@@ -188,7 +209,10 @@ export function requireSiteAdminAccess(scope?: RouteScope): AuthMiddleware {
     const hasAdminAccess = await getUserHasAdminAccessToSite(request, siteId);
     if (hasAdminAccess) {
       const session = await getSessionFromReq(request);
-      if (session?.user) request.user = session.user;
+      if (session?.user) {
+        if (!(await requirePrivilegedTwoFactor(session.user, reply))) return;
+        request.user = session.user;
+      }
       return;
     }
 
@@ -270,7 +294,10 @@ export function requireOrgMember(scope?: RouteScope): AuthMiddleware {
     const isMember = await getUserIsInOrg(request, organizationId);
     if (isMember) {
       const session = await getSessionFromReq(request);
-      if (session?.user) request.user = session.user;
+      if (session?.user) {
+        if (!(await requirePrivilegedTwoFactor(session.user, reply))) return;
+        request.user = session.user;
+      }
       return;
     }
 
@@ -335,6 +362,8 @@ export function requireOrgAdminFromParams(scope?: RouteScope): AuthMiddleware {
     if (member.role !== "admin" && member.role !== "owner") {
       return reply.status(403).send({ error: "You must be an admin or owner" });
     }
+
+    if (!(await requirePrivilegedTwoFactor(session.user, reply))) return;
 
     request.user = session.user;
   };

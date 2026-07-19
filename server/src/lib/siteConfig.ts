@@ -180,16 +180,13 @@ class SiteConfig {
    * Remove a site
    */
   async removeSite(siteIdOrId: number | string): Promise<void> {
-    try {
-      const isNumeric = this.isNumericId(siteIdOrId);
+    const isNumeric = this.isNumericId(siteIdOrId);
 
-      await db.delete(sites).where(isNumeric ? eq(sites.siteId, Number(siteIdOrId)) : eq(sites.id, String(siteIdOrId)));
+    await db.delete(sites).where(isNumeric ? eq(sites.siteId, Number(siteIdOrId)) : eq(sites.id, String(siteIdOrId)));
 
-      // Invalidate cache after deletion
-      this.cache.clear();
-    } catch (error) {
-      logger.error(error as Error, `Error removing site ${siteIdOrId}`);
-    }
+    // Database failures must propagate so callers never report a false
+    // successful delete while the site configuration still exists.
+    this.cache.clear();
   }
 
   /**
