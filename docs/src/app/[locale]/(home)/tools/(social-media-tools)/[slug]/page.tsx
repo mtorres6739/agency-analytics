@@ -9,31 +9,17 @@ import { HashtagGenerator } from "../components/HashtagGenerator";
 import { CharacterCounter } from "../components/CharacterCounter";
 import { BioGenerator } from "../components/BioGenerator";
 import { LogoGenerator } from "../components/LogoGenerator";
-import { platformConfigs, platformList } from "../components/platform-configs";
-import { commentPlatformConfigs, commentPlatformList } from "../components/comment-platform-configs";
-import { pageNamePlatformConfigs, pageNamePlatformList } from "../components/page-name-platform-configs";
-import {
-  postGeneratorPlatformConfigs,
-  postGeneratorPlatformList,
-} from "../components/post-generator-platform-configs";
-import {
-  usernameGeneratorPlatformConfigs,
-  usernameGeneratorPlatformList,
-} from "../components/username-generator-platform-configs";
-import {
-  hashtagGeneratorPlatformConfigs,
-  hashtagGeneratorPlatformList,
-} from "../components/hashtag-generator-platform-configs";
-import {
-  characterCounterPlatformConfigs,
-  characterCounterPlatformList,
-} from "../components/character-counter-platform-configs";
-import { bioGeneratorPlatformConfigs, bioGeneratorPlatformList } from "../components/bio-generator-platform-configs";
-import { imageResizerPlatformConfigs, imageResizerPlatformList } from "../components/image-resizer-platform-configs";
-import {
-  logoGeneratorPlatformConfigs,
-  logoGeneratorPlatformList,
-} from "../components/logo-generator-platform-configs";
+import { platformConfigs } from "../components/platform-configs";
+import { commentPlatformConfigs } from "../components/comment-platform-configs";
+import { pageNamePlatformConfigs } from "../components/page-name-platform-configs";
+import { postGeneratorPlatformConfigs } from "../components/post-generator-platform-configs";
+import { usernameGeneratorPlatformConfigs } from "../components/username-generator-platform-configs";
+import { hashtagGeneratorPlatformConfigs } from "../components/hashtag-generator-platform-configs";
+import { characterCounterPlatformConfigs } from "../components/character-counter-platform-configs";
+import { bioGeneratorPlatformConfigs } from "../components/bio-generator-platform-configs";
+import { imageResizerPlatformConfigs } from "../components/image-resizer-platform-configs";
+import { logoGeneratorPlatformConfigs } from "../components/logo-generator-platform-configs";
+import { socialMediaToolSlugs } from "../components/social-tool-slugs";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Hash, Palette, Type, User } from "lucide-react";
@@ -49,58 +35,7 @@ interface PageProps {
 
 // Generate static params for all platforms at build time
 export async function generateStaticParams() {
-  const fontGenerators = platformList.map(platform => ({
-    slug: `${platform.id}-font-generator`,
-  }));
-
-  const commentGenerators = commentPlatformList.map(platform => ({
-    slug: `${platform.id}-comment-generator`,
-  }));
-
-  const pageNameGenerators = pageNamePlatformList.map(platform => ({
-    slug: `${platform.id}-page-name-generator`,
-  }));
-
-  const postGenerators = postGeneratorPlatformList.map(platform => ({
-    slug: `${platform.id}-post-generator`,
-  }));
-
-  const usernameGenerators = usernameGeneratorPlatformList.map(platform => ({
-    slug: `${platform.id}-username-generator`,
-  }));
-
-  const hashtagGenerators = hashtagGeneratorPlatformList.map(platform => ({
-    slug: `${platform.id}-hashtag-generator`,
-  }));
-
-  const characterCounters = characterCounterPlatformList.map(platform => ({
-    slug: `${platform.id}-character-counter`,
-  }));
-
-  const bioGenerators = bioGeneratorPlatformList.map(platform => ({
-    slug: `${platform.id}-bio-generator`,
-  }));
-
-  const imageResizers = imageResizerPlatformList.map(platform => ({
-    slug: `${platform.id}-photo-resizer`,
-  }));
-
-  const logoGenerators = logoGeneratorPlatformList.map(platform => ({
-    slug: `${platform.id}-logo-generator`,
-  }));
-
-  return [
-    ...fontGenerators,
-    ...commentGenerators,
-    ...pageNameGenerators,
-    ...postGenerators,
-    ...usernameGenerators,
-    ...hashtagGenerators,
-    ...characterCounters,
-    ...bioGenerators,
-    ...imageResizers,
-    ...logoGenerators,
-  ];
+  return socialMediaToolSlugs.map(slug => ({ slug }));
 }
 
 // Generate metadata dynamically based on slug

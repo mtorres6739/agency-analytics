@@ -6,8 +6,19 @@ import { InteriorPageHero } from "@/components/InteriorPageHero";
 import { blogSource } from "@/lib/blog-source";
 
 export const metadata: Metadata = {
-  title: "Blog",
-  description: "Latest updates and insights from Rybbit",
+  title: "Blog — Web Analytics, Privacy & Open Source",
+  description:
+    "Tutorials and insights from the Rybbit team on web analytics, Google Analytics alternatives, privacy-first tracking, and building in the open.",
+  alternates: {
+    canonical: "https://rybbit.com/blog",
+  },
+  openGraph: {
+    title: "Rybbit Blog",
+    description:
+      "Tutorials and insights on web analytics, Google Analytics alternatives, privacy-first tracking, and building in the open.",
+    type: "website",
+    url: "https://rybbit.com/blog",
+  },
 };
 
 function formatDate(date: Date) {
