@@ -12,6 +12,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,14 +25,19 @@ jobs:
             client/package-lock.json
       - run: npm ci && npm run build
         working-directory: shared
-      - run: npm ci && npm run test:run -- src/api/agency && npm run build
+      - run: npm ci && npm audit --omit=dev --audit-level=high
         working-directory: server
-      - run: npm ci && npx tsc --noEmit && npm run build
+      - run: npm run test:run -- src/lib/auth-middleware.test.ts src/api/agency src/api/sites/deleteSite.test.ts src/services/tracker/trackEvent.test.ts && npm run build
+        working-directory: server
+      - run: npm ci && npm audit --omit=dev --audit-level=high && npx tsc --noEmit && npm run build
         working-directory: client
+      - run: bash -n infra/agency/deploy.sh infra/agency/backup.sh
+      - run: docker compose --env-file infra/agency/.env.production.example -f docker-compose.yml -f infra/agency/docker-compose.production.yml config --quiet
 
   publish:
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         include:
