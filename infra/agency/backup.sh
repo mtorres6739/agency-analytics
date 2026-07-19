@@ -26,6 +26,10 @@ set +a
 : "${BACKUP_S3_URI:?BACKUP_S3_URI is required}"
 : "${BACKUP_AGE_RECIPIENT:?BACKUP_AGE_RECIPIENT is required}"
 
+export AWS_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID:?S3_ACCESS_KEY_ID is required}"
+export AWS_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY:?S3_SECRET_ACCESS_KEY is required}"
+export AWS_DEFAULT_REGION="${S3_REGION:-us-east-1}"
+
 "${COMPOSE[@]}" exec -T postgres pg_dump --clean --if-exists --no-owner --format=custom \
   --username "${POSTGRES_USER}" "${POSTGRES_DB}" > "${WORK_DIR}/postgres.dump"
 
@@ -40,4 +44,3 @@ tar -czf "${ARCHIVE}" -C "${WORK_DIR}" postgres.dump "${CLICKHOUSE_FILE}"
 age --recipient "${BACKUP_AGE_RECIPIENT}" --output "${ARCHIVE}.age" "${ARCHIVE}"
 aws s3 cp "${ARCHIVE}.age" "${BACKUP_S3_URI%/}/$(basename "${ARCHIVE}.age")" --only-show-errors
 echo "Encrypted backup uploaded: $(basename "${ARCHIVE}.age")"
-

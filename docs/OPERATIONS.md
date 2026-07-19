@@ -39,9 +39,12 @@ Never run upstream `update.sh` in production. Upstream changes are merged into a
 
 Quarterly, create a clean staging environment and restore Postgres and ClickHouse. Verify login, organization membership, two-client isolation, analytics totals, goals, report schedules, and a sample report. Record elapsed time and any deviation from RPO 24 hours/RTO four hours.
 
+Use `infra/agency/restore.sh <encrypted-archive>` only in a clean recovery environment. `BACKUP_AGE_IDENTITY` must point to the root-readable age private key. Never restore over production as a test.
+
 ## Monitoring
 
 - External HTTPS checks for the application and `/api/health`.
+- `.github/workflows/production-smoke.yml` checks health, application reachability, HSTS, CSP, and MIME-sniffing protection every 15 minutes from outside Hetzner.
 - Container health for client, backend, Postgres, ClickHouse, Redis, and Caddy.
 - Alerts for CPU/disk over 70%, database health, ingestion queue lag over one minute, report failure rate, backup age, and TLS expiry.
 - Capacity review monthly and before bulk client onboarding.
