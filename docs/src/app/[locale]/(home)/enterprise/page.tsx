@@ -128,11 +128,11 @@ export default function EnterprisePage() {
       <section className="border-b border-neutral-200 dark:border-neutral-800" aria-labelledby="enterprise-proof">
         <div className="relative mx-auto grid max-w-[1200px] grid-cols-2 gap-px border-x border-neutral-200 bg-neutral-200 p-px dark:border-neutral-800 dark:bg-neutral-800 sm:grid-cols-3 lg:grid-cols-6">
           <GridCrosses />
-          <div className="col-span-full flex min-h-14 items-center bg-white px-5 dark:bg-neutral-950 sm:px-8">
+          {/* <div className="col-span-full flex min-h-14 items-center bg-white px-5 dark:bg-neutral-950 sm:px-8">
             <p id="enterprise-proof" className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
               Trusted by 10,000+ organizations worldwide
             </p>
-          </div>
+          </div> */}
           {enterpriseLogos.map(logo => (
             <div key={logo.alt} className="flex min-h-24 items-center justify-center bg-white dark:bg-neutral-950">
               <Image
