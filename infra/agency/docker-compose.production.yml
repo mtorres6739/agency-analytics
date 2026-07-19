@@ -15,6 +15,9 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - agency-backups:/backups
+    configs:
+      - source: agency_clickhouse_backup
+        target: /etc/clickhouse-server/config.d/backup.xml
     logging:
       options:
         max-size: 50m
@@ -72,3 +75,7 @@ volumes:
       type: none
       o: bind
       device: ${AGENCY_BACKUP_PATH:-/srv/agency-backups}
+
+configs:
+  agency_clickhouse_backup:
+    file: ./infra/agency/clickhouse-backup.xml

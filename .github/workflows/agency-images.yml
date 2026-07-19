@@ -31,7 +31,7 @@ jobs:
         working-directory: server
       - run: npm ci && npm audit --omit=dev --audit-level=high && npx tsc --noEmit && npm run build
         working-directory: client
-      - run: bash -n infra/agency/deploy.sh infra/agency/backup.sh
+      - run: bash -n infra/agency/deploy.sh infra/agency/backup.sh infra/agency/restore.sh infra/agency/install-backup-timer.sh
       - run: docker compose --env-file infra/agency/.env.production.example -f docker-compose.yml -f infra/agency/docker-compose.production.yml config --quiet
 
   publish:

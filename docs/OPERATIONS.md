@@ -35,6 +35,8 @@ Never run upstream `update.sh` in production. Upstream changes are merged into a
 - Keep 30 daily and 12 monthly restore points.
 - Enable Hetzner server backups as an additional recovery layer.
 
+Install the committed nightly timer with `sudo ./infra/agency/install-backup-timer.sh`. It runs at 03:15 UTC with up to 30 minutes of jitter and catches up after downtime. Confirm the first run with `systemctl status agency-analytics-backup.service` and verify the encrypted object in offsite storage.
+
 ## Restore drill
 
 Quarterly, create a clean staging environment and restore Postgres and ClickHouse. Verify login, organization membership, two-client isolation, analytics totals, goals, report schedules, and a sample report. Record elapsed time and any deviation from RPO 24 hours/RTO four hours.
