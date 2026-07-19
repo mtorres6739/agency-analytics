@@ -22,7 +22,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@nivo/bar": "0.96.0",
     "@nivo/calendar": "0.96.0",
-    "@nivo/line": "0.96.0",
+    "@nivo/line": "0.99.0",
     "@nivo/theming": "0.96.0",
     "@number-flow/react": "0.5.9",
     "@radix-ui/react-alert-dialog": "1.1.13",
