@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useExtracted } from "next-intl";
 import { toast } from "@/components/ui/sonner";
 
-import { IS_CLOUD } from "../lib/const";
+import { DEPLOYMENT, IS_CLOUD } from "../lib/const";
 import packageJson from "../../package.json";
 import { X } from "lucide-react";
 import { Button } from "./ui/button";
@@ -16,7 +16,7 @@ export function VersionCheck() {
   const t = useExtracted();
 
   const [shouldCheckVersion] = useState(() => {
-    if (IS_CLOUD || typeof window === "undefined") return false;
+    if (IS_CLOUD || DEPLOYMENT === "agency" || typeof window === "undefined") return false;
     return !sessionStorage.getItem(VERSION_CHECK_DONE_KEY);
   });
 

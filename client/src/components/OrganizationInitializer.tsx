@@ -6,6 +6,7 @@ import { useUserOrganizations } from "../api/admin/hooks/useOrganizations";
 import { useTrack } from "../hooks/useTrack";
 
 function OrganizationInitializerInner() {
+  useTrack();
   const { data: organizations } = useUserOrganizations();
   const { data: activeOrganization, isPending: isPendingActiveOrganization } = authClient.useActiveOrganization();
 
@@ -22,7 +23,6 @@ function OrganizationInitializerInner() {
 
 export function OrganizationInitializer() {
   const session = authClient.useSession();
-  useTrack();
   if (session.data?.user) {
     return <OrganizationInitializerInner />;
   }

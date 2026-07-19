@@ -6,16 +6,55 @@ import { AuthInput } from "@/components/auth/AuthInput";
 import { SocialButtons } from "@/components/auth/SocialButtons";
 import { Turnstile } from "@/components/auth/Turnstile";
 import { useExtracted } from "next-intl";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { RybbitTextLogo } from "../../components/RybbitLogo";
-import { SpinningGlobe } from "../../components/SpinningGlobe";
 import { useSetPageTitle } from "../../hooks/useSetPageTitle";
 import { authClient } from "../../lib/auth";
 import { useConfigs } from "../../lib/configs";
-import { IS_CLOUD } from "../../lib/const";
+import { DEPLOYMENT, IS_CLOUD } from "../../lib/const";
 import { userStore } from "../../lib/userStore";
+
+const SpinningGlobe = dynamic(() => import("../../components/SpinningGlobe").then(module => module.SpinningGlobe), {
+  ssr: false,
+});
+
+function AgencyLoginVisual() {
+  const t = useExtracted();
+  const cards = [t("Live traffic"), t("Conversions"), t("Core Web Vitals"), t("Uptime")];
+
+  return (
+    <div className="relative flex h-full min-h-[640px] flex-col justify-between overflow-hidden rounded-2xl bg-neutral-950 p-10 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.2),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.16),transparent_38%)]" />
+      <div className="relative">
+        <p className="text-sm font-medium text-emerald-300">{t("Private agency analytics")}</p>
+        <h2 className="mt-3 max-w-lg text-4xl font-semibold tracking-tight">{t("Every client. One clear view.")}</h2>
+        <p className="mt-4 max-w-md text-sm leading-6 text-neutral-300">
+          {t("Traffic, conversions, search, performance, uptime, and reporting in one secure workspace.")}
+        </p>
+      </div>
+      <div className="relative grid gap-3 sm:grid-cols-2" aria-hidden="true">
+        {cards.map((label, index) => (
+          <div key={label} className="rounded-xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+            <div className="mb-8 h-2 w-16 rounded-full bg-white/15" />
+            <p className="text-xs text-neutral-400">{label}</p>
+            <div className="mt-2 flex items-end gap-1">
+              {[36, 52, 42, 68, 58, 82, 72].map((height, barIndex) => (
+                <span
+                  key={`${index}-${barIndex}`}
+                  className="w-full rounded-sm bg-emerald-400/70"
+                  style={{ height: `${Math.round(height / 3)}px` }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Page() {
   const { configs, isLoading: isLoadingConfigs } = useConfigs();
@@ -73,15 +112,26 @@ export default function Page() {
 
   const turnstileEnabled = IS_CLOUD && process.env.NODE_ENV === "production";
 
+  const isAgency = DEPLOYMENT === "agency";
+
   return (
-    <div className="flex h-dvh w-full">
+    <main className="flex min-h-dvh w-full">
       {/* Left panel - login form */}
       <div className="w-full lg:w-[550px] flex flex-col p-6 lg:p-10">
         {/* Logo at top left */}
         <div className="mb-8">
-          <a href="https://rybbit.com" target="_blank" className="inline-block">
-            <RybbitTextLogo />
-          </a>
+          {isAgency ? (
+            <Link href="/" className="inline-flex items-center gap-3 font-semibold tracking-tight">
+              <span className="grid size-9 place-items-center rounded-xl bg-neutral-950 text-sm text-white dark:bg-white dark:text-neutral-950">
+                BA
+              </span>
+              {t("Bold Analytics")}
+            </Link>
+          ) : (
+            <a href="https://rybbit.com" target="_blank" rel="noopener noreferrer" className="inline-block">
+              <RybbitTextLogo />
+            </a>
+          )}
         </div>
         <div className="flex-1 flex flex-col justify-center w-full max-w-[550px] mx-auto">
           <h1 className="text-lg text-neutral-600 dark:text-neutral-300 mb-6">{t("Welcome back")}</h1>
@@ -137,7 +187,7 @@ export default function Page() {
               </div>
             </form>
 
-            {(!configs?.disableSignup || !isLoadingConfigs) && (
+            {!isLoadingConfigs && !configs?.disableSignup && (
               <div className="text-center text-sm">
                 {t("Don't have an account?")}{" "}
                 <Link
@@ -167,8 +217,8 @@ export default function Page() {
 
       {/* Right panel - globe (hidden on mobile/tablet) */}
       <div className="hidden lg:block lg:w-[calc(100%-550px)] relative m-3 rounded-2xl overflow-hidden">
-        <SpinningGlobe />
+        {isAgency ? <AgencyLoginVisual /> : <SpinningGlobe />}
       </div>
-    </div>
+    </main>
   );
 }
