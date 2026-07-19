@@ -1,6 +1,8 @@
 "use client";
 
 import { AppLink } from "@/components/AppLink";
+import { DesktopNav } from "@/components/header/DesktopNav";
+import { MobileNav } from "@/components/header/MobileNav";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { trackAdEvent } from "@/lib/trackAdEvent";
 import { Menu, X } from "lucide-react";
@@ -12,13 +14,6 @@ import { useState } from "react";
 export function CustomHeader() {
   const t = useExtracted();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const navItems = [
-    { href: "/pricing", label: t("Pricing") },
-    { href: "/features", label: t("Features") },
-    { href: "/docs", label: t("Docs") },
-    { href: "/sponsors", label: t("Sponsors") },
-  ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-neutral-200 bg-white/95 backdrop-blur-sm dark:border-neutral-800 dark:bg-neutral-950/95">
@@ -42,19 +37,9 @@ export function CustomHeader() {
           />
         </Link>
 
-        <div className="hidden items-center md:flex">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-2.5 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
+        <DesktopNav />
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           <ThemeSwitcher />
           <AppLink
             href="https://app.rybbit.io"
@@ -78,7 +63,7 @@ export function CustomHeader() {
 
         <button
           type="button"
-          className="inline-flex size-10 items-center justify-center rounded-md text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-white md:hidden"
+          className="inline-flex size-10 items-center justify-center rounded-md text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-white lg:hidden"
           onClick={() => setMobileMenuOpen((open) => !open)}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-navigation"
@@ -88,54 +73,7 @@ export function CustomHeader() {
         </button>
       </nav>
 
-      {mobileMenuOpen && (
-        <div id="mobile-navigation" className="border-t border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950 md:hidden">
-          <div className="mx-auto max-w-[1200px] border-x border-neutral-200 px-5 py-4 dark:border-neutral-800 sm:px-8">
-            <div className="grid gap-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="rounded-md px-3 py-3 text-base font-medium text-neutral-700 transition-colors hover:bg-neutral-100 hover:text-neutral-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-white"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between border-t border-neutral-200 pt-4 dark:border-neutral-800">
-              <ThemeSwitcher />
-              <div className="flex items-center gap-2">
-                <AppLink
-                  href="https://app.rybbit.io"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => {
-                    trackAdEvent("login", { location: "header" });
-                    setMobileMenuOpen(false);
-                  }}
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-neutral-300 px-4 text-sm font-medium text-neutral-900 dark:border-neutral-700 dark:text-white"
-                >
-                  {t("Login")}
-                </AppLink>
-                <AppLink
-                  href="https://app.rybbit.io/signup"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => {
-                    trackAdEvent("signup", { location: "header" });
-                    setMobileMenuOpen(false);
-                  }}
-                  className="inline-flex h-10 items-center justify-center rounded-md bg-emerald-600 px-4 text-sm font-medium text-white"
-                >
-                  {t("Sign up")}
-                </AppLink>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {mobileMenuOpen && <MobileNav onNavigate={() => setMobileMenuOpen(false)} />}
     </header>
   );
 }

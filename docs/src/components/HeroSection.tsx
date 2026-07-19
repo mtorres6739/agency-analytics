@@ -31,12 +31,7 @@ interface HeroSectionProps {
   showGitHubStar?: boolean;
 }
 
-export function HeroSection({
-  title,
-  subtitle,
-  showEUFlag = true,
-  showGitHubStar = true,
-}: HeroSectionProps) {
+export function HeroSection({ title, subtitle, showEUFlag = true, showGitHubStar = true }: HeroSectionProps) {
   const t = useExtracted();
 
   return (
@@ -117,7 +112,12 @@ export function HeroSection({
                     viewBox="0 0 8 8"
                     className="size-1.5 opacity-0 transition-opacity duration-150 group-hover/lights:opacity-100 motion-reduce:transition-none"
                   >
-                    <path d="M2.2 2.2l3.6 3.6M5.8 2.2L2.2 5.8" stroke="#8c1a10" strokeWidth="1.1" strokeLinecap="round" />
+                    <path
+                      d="M2.2 2.2l3.6 3.6M5.8 2.2L2.2 5.8"
+                      stroke="#8c1a10"
+                      strokeWidth="1.1"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </span>
                 <span className="flex size-2.5 items-center justify-center rounded-full bg-[#febc2e]">
@@ -145,22 +145,25 @@ export function HeroSection({
               >
                 demo.rybbit.com
               </a>
-              <div className="flex items-center justify-self-end gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              {/* <div className="flex items-center justify-self-end gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
                 <span className="relative flex size-2" aria-hidden="true">
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60 motion-reduce:hidden" />
                   <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                 </span>
                 <span className="hidden sm:inline">{t("Live")}</span>
-              </div>
+              </div> */}
             </div>
-            <iframe
-              src="https://demo.rybbit.com/81/main"
-              width="100%"
-              height="750"
-              className="block h-[600px] min-w-0 max-w-full md:h-[700px] lg:h-[750px]"
-              style={{ border: "none" }}
-              title="Rybbit Analytics Demo"
-            />
+            {/* md+: render the demo at a 125% viewport and scale to 0.8 so it
+                shows its full desktop layout at preview size. Keep 1:1 on
+                mobile — a scaled viewport would land between the demo's
+                responsive breakpoints. The two values must stay reciprocal. */}
+            <div className="h-[600px] min-w-0 max-w-full overflow-hidden md:h-[700px] lg:h-[750px]">
+              <iframe
+                src="https://demo.rybbit.com/81/main"
+                className="block h-full w-full border-none md:h-[117.6%] md:w-[117.6%] md:origin-top-left md:scale-[0.85]"
+                title="Rybbit Analytics Demo"
+              />
+            </div>
           </div>
         </div>
       </div>
