@@ -48,6 +48,12 @@ export function AgencyShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-neutral-50 text-neutral-950 dark:bg-neutral-950 dark:text-white">
+      <a
+        href="#agency-main-content"
+        className="fixed start-4 top-4 z-[100] -translate-y-24 rounded-lg bg-neutral-950 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 dark:bg-white dark:text-neutral-950"
+      >
+        {t("Skip to main content")}
+      </a>
       <aside className="fixed inset-y-0 start-0 z-40 hidden w-64 border-e border-neutral-200 bg-white lg:block dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex h-16 items-center gap-3 border-b border-neutral-200 px-5 dark:border-neutral-800">
           <span className="grid size-9 place-items-center rounded-xl bg-neutral-950 text-white dark:bg-white dark:text-neutral-950">
@@ -75,7 +81,7 @@ export function AgencyShell({ children }: { children: ReactNode }) {
           <span className="font-semibold">{t("Agency Analytics")}</span>
           <button
             type="button"
-            className="rounded-lg p-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 dark:hover:bg-neutral-800"
+            className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 dark:hover:bg-neutral-800"
             data-hs-overlay="#agency-mobile-sidebar"
             aria-label={t("Close navigation")}
           >
@@ -92,7 +98,7 @@ export function AgencyShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-neutral-200 bg-white/95 px-4 backdrop-blur sm:px-6 dark:border-neutral-800 dark:bg-neutral-900/95">
           <button
             type="button"
-            className="rounded-lg p-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 lg:hidden dark:hover:bg-neutral-800"
+            className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 lg:hidden dark:hover:bg-neutral-800"
             data-hs-overlay="#agency-mobile-sidebar"
             aria-controls="agency-mobile-sidebar"
             aria-label={t("Open navigation")}
@@ -108,7 +114,9 @@ export function AgencyShell({ children }: { children: ReactNode }) {
             <ChevronDown className="size-4 -rotate-90" aria-hidden="true" />
           </Link>
         </header>
-        <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
+        <main id="agency-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
       </div>
     </div>
   );
