@@ -25,6 +25,9 @@ As of 2026-07-19, `npm audit --omit=dev` reports zero production advisories for 
 - No secret may use a `NEXT_PUBLIC_` name.
 - Logs redact authorization headers, cookies, OAuth tokens, recipient addresses, and signed URLs.
 - Rotate credentials after suspected disclosure and at least annually.
+- Tracking deployment uses a separate Cloudflare token limited to Workers Scripts Write, Zone Read, DNS Read, and Workers Routes Write on explicit account zones. The Global API key is bootstrap-only and must not be used by the installer.
+- Vercel/GitHub installation opens a preview PR and does not merge production. Generated source contains only a public analytics origin and numeric site ID.
+- WordPress Application Passwords are sent only to the exact HTTPS site origin and are never stored in the client application or analytics database.
 
 ## Data collection
 
@@ -51,6 +54,7 @@ As of 2026-07-19, `npm audit --omit=dev` reports zero production advisories for 
 - `ENFORCE_AGENCY_TWO_FACTOR=true` rejects privileged authenticated API access until Better Auth TOTP enrollment is complete. TOTP secrets and backup codes are encrypted with `BETTER_AUTH_SECRET`, failed challenges lock after five attempts for 15 minutes, and client viewers are not forced into the agency-admin policy.
 - Open signup disabled after bootstrap.
 - Public dashboards and permanent private links disabled by default.
+- Tracking installers fail closed on domain/site ambiguity, DNS-only edge targets, inherited Worker route conflicts, existing Next.js instrumentation, unsupported framework versions, and incompatible CSP.
 
 ## Incident response
 

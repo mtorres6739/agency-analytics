@@ -106,3 +106,30 @@ Every handler validates Zod input, verifies organization membership, derives acc
 - Dashboard p95 target: under two seconds for 30-day queries.
 - Scale triggers: CPU or disk over 70%, ingestion lag over one minute, or p95 above target.
 - First resize: CCX33-equivalent. Second step: separate ClickHouse/data and application tiers.
+
+## Managed tracking deployment
+
+Tracking installation uses two provider adapters with the same contract: explicit domain-to-site mapping, read-only plan, apply, installation verification, event verification, and rollback.
+
+### Cloudflare edge adapter
+
+- `infra/tracking-edge` targets websites already proxied through Cloudflare, regardless of whether the origin is WordPress or Vercel.
+- One site-scoped Worker per Rybbit site ID handles `hostname/*`. It passes origin traffic through, injects the tracker only into public HTML, and proxies `/<reserved-prefix>/*` to the matching Agency Analytics `/api/*` path.
+- The same-origin proxy reduces ad-blocker and CSP failures. Existing script nonces are reused; nonce-required pages without an available nonce are not modified.
+- Plan fails for DNS-only hostnames, exact or inherited all-path Worker route conflicts, existing tracker conflicts, and missing token permissions.
+- Site-scoped scripts prevent a partial manifest from replacing another client's hostname mapping.
+
+### Vercel source adapter
+
+- `infra/tracking-vercel` resolves the Vercel project, connected GitHub repository, production branch, monorepo root, Next.js version, TypeScript usage, and production CSP.
+- Next.js 15.3+ receives a single managed `instrumentation-client.ts|js` file. Existing instrumentation is never overwritten.
+- Apply creates an auditable `codex/agency-analytics-<siteId>` PR. Vercel's Git integration creates the preview; the adapter never merges or promotes production automatically.
+- Installation acceptance requires the Vercel preview to be ready, a real browser load with no tracker/CSP error, and a received event confirmed through the existing Agency Analytics **Verify** action.
+
+### WordPress fallback
+
+Cloudflare-proxied WordPress uses the edge adapter. A DNS-only WordPress site can install and activate the public `integrate-rybbit` plugin through WordPress's authenticated plugin REST API, but that plugin does not expose its site ID and self-hosted script URL through REST. Full zero-touch configuration therefore requires WP-CLI/SFTP access or a separately reviewed managed connector plugin. The system must not claim full automatic installation when only an Application Password is available.
+
+### Application integration target
+
+The operator tools are the first production-safe slice. The client onboarding UI will invoke the same provider contract through queued server jobs after deployment credentials are moved to a dedicated secret manager. The browser will receive sanitized plan/status data only; provider tokens, repository credentials, and WordPress application passwords remain server-side.

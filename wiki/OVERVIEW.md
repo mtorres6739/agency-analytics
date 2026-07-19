@@ -38,6 +38,8 @@ Implemented on `codex/agency-analytics-v1` against upstream `3ac02f2d4983fb4865e
 - `shared/src/agency.ts` is the cross-runtime contract source.
 - `/portfolio`, `/clients`, `/clients/[clientId]`, and `/reports` use the public Preline runtime through `preline/non-auto` and preserve canonical Rybbit site dashboards.
 - `infra/agency/` owns the Hetzner production overlay, hardened Caddy policy, immutable-SHA deploy/rollback script, and encrypted offsite backup script.
+- `infra/tracking-edge/` installs a same-origin tracker through site-scoped Cloudflare Workers for already-proxied WordPress or Vercel domains, with explicit manifests and plan/apply/verify/rollback gates.
+- `infra/tracking-vercel/` discovers a Vercel project's GitHub source and opens a single-file Next.js 15.3+ instrumentation PR for preview-first installation.
 - `.github/workflows/agency-images.yml` verifies and publishes commit-SHA images to GHCR.
 - Better Auth TOTP, encrypted backup codes, account lockout, and server-side privileged-role enforcement protect agency owners and administrators.
 - `server/src/services/agencyReports/` dispatches due schedules through BullMQ, renders private PDFs, stores encrypted S3 artifacts, creates seven-day signed downloads, sends aggregate Resend summaries, and recovers queued jobs after restart.
@@ -51,12 +53,14 @@ Verified locally and in CI: shared build, server build, 25 focused tests includi
 - Deployed release: `da0fdb6e30d9d423170d46ba4f6824093310bf12`
 - Runtime: Hetzner `agency-analytics-prod-01`, Ashburn CCX23, Ubuntu 24.04, provider backups enabled, and a 100 GB attached backup volume.
 - Edge: Cloudflare proxy, hostname-scoped Full (strict) origin TLS, Browser Integrity Check, edge RUM disabled, and Hetzner 80/443 ingress restricted to Cloudflare's published networks. Direct origin web access is blocked.
-- Access: first owner `torres.mathew@gmail.com`, organization `bold-media`, open signup disabled, bootstrap password stored in the local macOS Keychain service `analytics.boldmedia.cc`, and privileged APIs fail closed with `TWO_FACTOR_REQUIRED` until TOTP enrollment.
+- Access: first owner `torres.mathew@gmail.com`, organization `bold-media`, open signup disabled, bootstrap password stored in the local macOS Keychain service `analytics.boldmedia.cc`, and TOTP active for privileged agency APIs.
 - Delivery: immutable public GHCR images, SHA deploy/rollback, every-15-minute external smoke checks, Resend delivery, and private S3 report artifacts.
 - Recovery: nightly systemd timer, encrypted Postgres and ClickHouse backups, AES-256 S3 storage, 400-day database-backup retention, 90-day report retention, and successful age/Postgres/ClickHouse archive integrity validation.
 - Live browser gate: Lighthouse login scores 90 performance, 100 accessibility, and 100 best practices with no console errors.
 
-Human/pilot gates still required before onboarding all clients: enroll the owner TOTP device, add Google OAuth credentials if Google login is wanted, run the three-site 14-day GA4 comparison pilot, complete projected-load testing with representative event volume, and execute the quarterly full restore into an isolated staging environment. The encrypted artifact integrity check passed, but it is not a substitute for the first clean-environment restoration drill.
+Human/pilot gates still required before onboarding all clients: add Google OAuth credentials if Google login is wanted, run the three-site 14-day GA4 comparison pilot, complete projected-load testing with representative event volume, and execute the quarterly full restore into an isolated staging environment. The encrypted artifact integrity check passed, but it is not a substitute for the first clean-environment restoration drill.
+
+Tracking deployment is ready for an exact pilot mapping. A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocked a DNS-only Vercel domain; those projects use the Vercel/GitHub preview-PR adapter instead. No client domain, repository, or production deployment has been changed yet because a real Rybbit site ID has not been selected for the pilot.
 
 ## Knowledge rule
 

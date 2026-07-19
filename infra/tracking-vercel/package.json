@@ -1,0 +1,13 @@
+{
+  "name": "@bold-media/tracking-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "plan": "scripts/manage-local.zsh plan",
+    "apply": "scripts/manage-local.zsh apply",
+    "status": "scripts/manage-local.zsh status",
+    "rollback": "scripts/manage-local.zsh rollback"
+  }
+}

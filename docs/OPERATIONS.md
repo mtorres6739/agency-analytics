@@ -57,3 +57,26 @@ Use `infra/agency/restore.sh <encrypted-archive>` only in a clean recovery envir
 - Pin and record the upstream SHA.
 - Re-run server tests, client lint/typecheck/build, tenant isolation, and Docker smoke checks.
 - Never deploy the floating `latest` tag.
+
+## Tracking installation operations
+
+Use `infra/tracking-edge` for an already Cloudflare-proxied domain and `infra/tracking-vercel` for a DNS-only Next.js project on Vercel. Never enable the Cloudflare proxy solely to make tracker deployment easier; that is a separate networking change requiring application review.
+
+Cloudflare sequence:
+
+1. Copy `site-manifest.example.json` to the ignored `site-manifest.json` and enter the exact production hostname and Rybbit site ID.
+2. Run `npm test` and `npm run plan:keychain`.
+3. Resolve any unproxied DNS or Worker route conflict. Do not replace an existing route.
+4. Run `npm run apply:keychain`, then `npm run verify`.
+5. Open the real website in a browser and use the client page **Verify** button to prove event ingestion.
+6. Run `npm run rollback:keychain` to remove only those site-scoped routes if acceptance fails.
+
+Vercel sequence:
+
+1. Enter the exact hostname, Rybbit site ID, and Vercel project in the ignored manifest.
+2. Run `npm test` and `npm run plan`.
+3. Run `npm run apply`; inspect the generated PR and `npm run status` output.
+4. Test the Vercel preview in a real browser and verify event ingestion before merging.
+5. Use `npm run rollback` only while the PR is unmerged. After merge, use a normal revert PR.
+
+The Cloudflare deployment token is stored in macOS Keychain service `agency-analytics-cloudflare-tracking-edge`. It is limited to Workers script deployment plus zone/DNS read and Worker route changes for the 49 active zones present on 2026-07-19. Expand or rotate it when zones change; never replace it with the Global API key. Vercel and GitHub credentials are loaded from their authenticated CLIs and are never printed or committed.

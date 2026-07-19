@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "analyticsOrigin": "https://analytics.boldmedia.cc",
+  "pathPrefix": "/__bold-analytics",
+  "sites": [
+    {
+      "hostname": "example.com",
+      "siteId": 123,
+      "enabled": true
+    }
+  ]
+}

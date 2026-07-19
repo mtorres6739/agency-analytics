@@ -1,0 +1,16 @@
+{
+  "name": "@bold-media/tracking-edge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "plan": "node scripts/manage.mjs plan",
+    "apply": "node scripts/manage.mjs apply",
+    "verify": "node scripts/manage.mjs verify",
+    "rollback": "node scripts/manage.mjs rollback",
+    "plan:keychain": "scripts/manage-keychain.zsh plan",
+    "apply:keychain": "scripts/manage-keychain.zsh apply",
+    "rollback:keychain": "scripts/manage-keychain.zsh rollback"
+  }
+}
