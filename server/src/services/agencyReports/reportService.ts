@@ -20,6 +20,7 @@ import {
 } from "../../db/postgres/schema.js";
 import { buildGoalCondition } from "../../api/analytics/goals/goalConditions.js";
 import { processResults } from "../../api/analytics/utils/utils.js";
+import { formatClickHouseDateTime64 } from "../../lib/clickhouseDate.js";
 import { createServiceLogger } from "../../lib/logger/logger.js";
 
 const QUEUE_NAME = "agency-reports";
@@ -140,7 +141,11 @@ async function buildSummary(clientId: string, start: Date, end: Date): Promise<A
       })
       .filter((condition): condition is string => Boolean(condition));
     const conversionSelect = goalConditions.length ? `uniqExactIf(session_id, ${goalConditions.join(" OR ")})` : "0";
-    const params = { siteIds, start: start.toISOString(), end: end.toISOString() };
+    const params = {
+      siteIds,
+      start: formatClickHouseDateTime64(start),
+      end: formatClickHouseDateTime64(end),
+    };
     const [overviewResult, pagesResult, acquisitionResult] = await Promise.all([
       clickhouse.query({
         query: `SELECT uniqExact(user_id) visitors, uniqExact(session_id) sessions, ${conversionSelect} conversions, avgOrNull(lcp) lcp, avgOrNull(cls) cls, avgOrNull(inp) inp FROM events WHERE site_id IN {siteIds:Array(Int32)} AND timestamp >= {start:DateTime64(3)} AND timestamp < {end:DateTime64(3)}`,

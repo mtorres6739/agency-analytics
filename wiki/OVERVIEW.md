@@ -50,7 +50,7 @@ Verified locally and in CI: shared build, server build, 25 focused tests includi
 
 - Live URL: `https://analytics.boldmedia.cc`
 - Public source: `https://github.com/mtorres6739/agency-analytics`
-- Deployed release: `da0fdb6e30d9d423170d46ba4f6824093310bf12`
+- Deployed release source of truth: `/srv/agency-analytics/infra/agency/.deployed-sha` on the production host; every release uses a full immutable commit SHA.
 - Runtime: Hetzner `agency-analytics-prod-01`, Ashburn CCX23, Ubuntu 24.04, provider backups enabled, and a 100 GB attached backup volume.
 - Edge: Cloudflare proxy, hostname-scoped Full (strict) origin TLS, Browser Integrity Check, edge RUM disabled, and Hetzner 80/443 ingress restricted to Cloudflare's published networks. Direct origin web access is blocked.
 - Access: first owner `torres.mathew@gmail.com`, organization `bold-media`, open signup disabled, bootstrap password stored in the local macOS Keychain service `analytics.boldmedia.cc`, and TOTP active for privileged agency APIs.
@@ -60,7 +60,11 @@ Verified locally and in CI: shared build, server build, 25 focused tests includi
 
 Human/pilot gates still required before onboarding all clients: add Google OAuth credentials if Google login is wanted, run the three-site 14-day GA4 comparison pilot, complete projected-load testing with representative event volume, and execute the quarterly full restore into an isolated staging environment. The encrypted artifact integrity check passed, but it is not a substitute for the first clean-environment restoration drill.
 
-Tracking deployment is ready for an exact pilot mapping. A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocked a DNS-only Vercel domain; those projects use the Vercel/GitHub preview-PR adapter instead. No client domain, repository, or production deployment has been changed yet because a real Rybbit site ID has not been selected for the pilot.
+The first Vercel pilot is live on `www.neuron-connect.com` as Rybbit site `1` with public tracker property ID `22256ab1cdfe`. The project uses `src/instrumentation-client.ts` plus exact `script-src` and `connect-src` CSP allowances for `https://analytics.boldmedia.cc`. Preview and canonical-production pageviews were both verified in ClickHouse before and after merge of Neuron Connect PR `#16` on 2026-07-19.
+
+The pilot also validated the complete agency workflow: controlled client creation, team provisioning, site assignment, preview-host exclusions, first-event verification, and 30-day client summary queries. ClickHouse `DateTime64(3)` parameters must use `YYYY-MM-DD HH:mm:ss.SSS`; JavaScript ISO strings with a trailing `Z` fail with `BAD_QUERY_PARAMETER`.
+
+A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocks DNS-only Vercel domains; those projects use the Vercel/GitHub preview-PR adapter instead.
 
 ## Knowledge rule
 

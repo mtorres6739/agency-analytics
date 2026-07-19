@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { clickhouse } from "../../db/clickhouse/clickhouse.js";
 import { db } from "../../db/postgres/postgres.js";
+import { formatClickHouseDateTime64 } from "../../lib/clickhouseDate.js";
 import {
   agencyAuditEvents,
   agencyClients,
@@ -494,8 +495,8 @@ export async function getAgencyClientSummary(
         `,
         query_params: {
           siteIds,
-          start: start.toISOString(),
-          end: end.toISOString(),
+          start: formatClickHouseDateTime64(start),
+          end: formatClickHouseDateTime64(end),
         },
         format: "JSONEachRow",
       });
