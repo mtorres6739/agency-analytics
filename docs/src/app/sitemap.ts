@@ -99,10 +99,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Persona / solutions pages
   const personaSlugs = [
     "for-agencies",
+    "white-label",
     "for-developers",
     "for-startups",
     "for-saas",
     "for-ecommerce",
+    "for-small-business",
     "for-creators",
     "for-european-companies",
     "enterprise",

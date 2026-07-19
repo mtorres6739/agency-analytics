@@ -112,10 +112,12 @@ export function useHeaderNav() {
     links: [
       { href: "/for-saas", label: t("SaaS") },
       { href: "/for-startups", label: t("Startups") },
+      { href: "/for-small-business", label: t("Small businesses") },
       { href: "/for-ecommerce", label: t("Ecommerce") },
       { href: "/for-creators", label: t("Creators") },
       { href: "/for-developers", label: t("Developers") },
       { href: "/for-agencies", label: t("Agencies") },
+      { href: "/white-label", label: t("White label") },
       { href: "/for-european-companies", label: t("European companies") },
     ],
   };

@@ -5,9 +5,11 @@ import Link from "next/link";
 export type PersonaSlug =
   | "for-developers"
   | "for-agencies"
+  | "white-label"
   | "for-startups"
   | "for-saas"
   | "for-ecommerce"
+  | "for-small-business"
   | "for-creators"
   | "for-european-companies"
   | "enterprise";
@@ -24,6 +26,11 @@ const personas: { slug: PersonaSlug; title: string; description: string }[] = [
     description: "One workspace for every client site, with dashboards clients can read on their own.",
   },
   {
+    slug: "white-label",
+    title: "White label",
+    description: "Embed dashboards, build on the API, or self-host — analytics under your own brand.",
+  },
+  {
     slug: "for-startups",
     title: "For startups",
     description: "Answers about your traffic and product without hiring a data team.",
@@ -37,6 +44,11 @@ const personas: { slug: PersonaSlug; title: string; description: string }[] = [
     slug: "for-ecommerce",
     title: "For ecommerce",
     description: "Checkout funnels, campaign tracking, and full traffic with no consent banner.",
+  },
+  {
+    slug: "for-small-business",
+    title: "For small businesses",
+    description: "The handful of numbers that matter, with no GA4 setup and no cookie banner.",
   },
   {
     slug: "for-creators",
