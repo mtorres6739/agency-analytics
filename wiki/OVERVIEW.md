@@ -42,9 +42,21 @@ Implemented on `codex/agency-analytics-v1` against upstream `3ac02f2d4983fb4865e
 - Better Auth TOTP, encrypted backup codes, account lockout, and server-side privileged-role enforcement protect agency owners and administrators.
 - `server/src/services/agencyReports/` dispatches due schedules through BullMQ, renders private PDFs, stores encrypted S3 artifacts, creates seven-day signed downloads, sends aggregate Resend summaries, and recovers queued jobs after restart.
 
-Verified locally: shared build, server build, 25 focused tests including cross-client direct-URL isolation, privileged TOTP enforcement, deletion privacy, and ingestion throttling, client typecheck, client production build, shell syntax, and Compose model validation.
+Verified locally and in CI: shared build, server build, 25 focused tests including cross-client direct-URL isolation, privileged TOTP enforcement, deletion privacy, and ingestion throttling, client typecheck, client production build, production dependency audits, shell syntax, and Compose model validation.
 
-Production infrastructure is provisioned at `analytics.boldmedia.cc` on an Ashburn Hetzner CCX23 with a strict firewall, provider backups, and a 100 GB attached backup volume. Remaining release checks are image publication, secret injection, live migration/deployment, Cloudflare proxy hardening, first-owner TOTP enrollment, external monitoring, restore verification, browser accessibility QA, load testing, and the three-site 14-day GA4 pilot.
+## Production state
+
+- Live URL: `https://analytics.boldmedia.cc`
+- Public source: `https://github.com/mtorres6739/agency-analytics`
+- Deployed release: `da0fdb6e30d9d423170d46ba4f6824093310bf12`
+- Runtime: Hetzner `agency-analytics-prod-01`, Ashburn CCX23, Ubuntu 24.04, provider backups enabled, and a 100 GB attached backup volume.
+- Edge: Cloudflare proxy, hostname-scoped Full (strict) origin TLS, Browser Integrity Check, edge RUM disabled, and Hetzner 80/443 ingress restricted to Cloudflare's published networks. Direct origin web access is blocked.
+- Access: first owner `torres.mathew@gmail.com`, organization `bold-media`, open signup disabled, bootstrap password stored in the local macOS Keychain service `analytics.boldmedia.cc`, and privileged APIs fail closed with `TWO_FACTOR_REQUIRED` until TOTP enrollment.
+- Delivery: immutable public GHCR images, SHA deploy/rollback, every-15-minute external smoke checks, Resend delivery, and private S3 report artifacts.
+- Recovery: nightly systemd timer, encrypted Postgres and ClickHouse backups, AES-256 S3 storage, 400-day database-backup retention, 90-day report retention, and successful age/Postgres/ClickHouse archive integrity validation.
+- Live browser gate: Lighthouse login scores 90 performance, 100 accessibility, and 100 best practices with no console errors.
+
+Human/pilot gates still required before onboarding all clients: enroll the owner TOTP device, add Google OAuth credentials if Google login is wanted, run the three-site 14-day GA4 comparison pilot, complete projected-load testing with representative event volume, and execute the quarterly full restore into an isolated staging environment. The encrypted artifact integrity check passed, but it is not a substitute for the first clean-environment restoration drill.
 
 ## Knowledge rule
 
