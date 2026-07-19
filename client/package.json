@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3002",
+    "prebuild": "npm run materialize:shared",
     "build": "next build",
+    "materialize:shared": "node scripts/materialize-shared.mjs",
     "start": "next start -p 3002",
     "extract": "node scripts/extract-messages.mjs",
     "lint": "eslint .",
