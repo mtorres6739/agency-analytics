@@ -53,7 +53,7 @@ Verified locally and in CI: shared build, server build, 25 focused tests includi
 - Deployed release source of truth: `/srv/agency-analytics/infra/agency/.deployed-sha` on the production host; every release uses a full immutable commit SHA.
 - Runtime: Hetzner `agency-analytics-prod-01`, Ashburn CCX23, Ubuntu 24.04, provider backups enabled, and a 100 GB attached backup volume.
 - Edge: Cloudflare proxy, hostname-scoped Full (strict) origin TLS, Browser Integrity Check, edge RUM disabled, and Hetzner 80/443 ingress restricted to Cloudflare's published networks. Direct origin web access is blocked.
-- Access: first owner `torres.mathew@gmail.com`, organization `bold-media`, open signup disabled, bootstrap password stored in the local macOS Keychain service `analytics.boldmedia.cc`, and TOTP active for privileged agency APIs.
+- Access: first owner `torres.mathew@gmail.com`, organization display name `SDM`, organization slug `bold-media`, open signup disabled, bootstrap password stored in the local macOS Keychain service `analytics.boldmedia.cc`, and TOTP active for privileged agency APIs.
 - Delivery: immutable public GHCR images, SHA deploy/rollback, every-15-minute external smoke checks, Resend delivery, and private S3 report artifacts.
 - Recovery: nightly systemd timer, encrypted Postgres and ClickHouse backups, AES-256 S3 storage, 400-day database-backup retention, 90-day report retention, and successful age/Postgres/ClickHouse archive integrity validation.
 - Live browser gate: Lighthouse login scores 90 performance, 100 accessibility, and 100 best practices with no console errors.
