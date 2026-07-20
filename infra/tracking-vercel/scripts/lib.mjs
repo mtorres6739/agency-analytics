@@ -171,7 +171,7 @@ export class GitHubClient extends ApiClient {
         title: "Add Agency Analytics tracking",
         head: branch,
         base,
-        body: `Installs the managed Agency Analytics tracker for **${hostname}** (site ID \`${siteId}\`).\n\nVercel will create a preview deployment. Verify a browser event in https://analytics.boldmedia.cc before merging.`,
+        body: `Installs the managed Agency Analytics tracker for **${hostname}** (site ID \`${siteId}\`).\n\nVercel will create a preview deployment. Verify a browser event in https://analytics.myfusionadmin.com before merging.`,
       }),
     });
   }

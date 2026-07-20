@@ -1,4 +1,4 @@
-{$DOMAIN_NAME} {
+(agency_analytics_app) {
     encode zstd gzip
 
     log {
@@ -33,4 +33,12 @@
     handle {
         reverse_proxy client:3002
     }
+}
+
+{$DOMAIN_NAME} {
+    import agency_analytics_app
+}
+
+{$LEGACY_DOMAIN_NAME} {
+    redir https://{$DOMAIN_NAME}{uri} permanent
 }

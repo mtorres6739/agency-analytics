@@ -44,7 +44,7 @@ jobs:
           - name: client
             dockerfile: client/Dockerfile
             build_args: |
-              NEXT_PUBLIC_BACKEND_URL=https://analytics.boldmedia.cc
+              NEXT_PUBLIC_BACKEND_URL=https://analytics.myfusionadmin.com
               NEXT_PUBLIC_DISABLE_SIGNUP=true
               NEXT_PUBLIC_LITE_DASHBOARD=false
               NEXT_PUBLIC_DEPLOYMENT=agency

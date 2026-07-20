@@ -8,7 +8,7 @@
 
 Current production allocation:
 
-- Hostname: `analytics.boldmedia.cc`
+- Hostname: `analytics.myfusionadmin.com`
 - Hetzner server: `agency-analytics-prod-01` (`CCX23`, Ashburn)
 - Backup volume: `agency-analytics-prod-backups` (100 GB, mounted at `/srv/agency-backups`)
 - Application root: `/srv/agency-analytics`

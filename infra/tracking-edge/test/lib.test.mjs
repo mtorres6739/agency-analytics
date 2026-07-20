@@ -5,7 +5,7 @@ import { buildWorker, normalizeHostname, routePatternCoversHostname, validateMan
 
 const VALID_MANIFEST = {
   version: 1,
-  analyticsOrigin: "https://analytics.boldmedia.cc",
+  analyticsOrigin: "https://analytics.myfusionadmin.com",
   pathPrefix: "/__bold-analytics",
   sites: [{ hostname: "WWW.Example.com", siteId: 42, enabled: true }],
 };
@@ -22,7 +22,7 @@ test("rejects duplicate hosts and unsafe analytics recursion", () => {
     /Duplicate hostname/
   );
   assert.throws(
-    () => validateManifest({ ...VALID_MANIFEST, sites: [{ hostname: "analytics.boldmedia.cc", siteId: 1 }] }),
+    () => validateManifest({ ...VALID_MANIFEST, sites: [{ hostname: "analytics.myfusionadmin.com", siteId: 1 }] }),
     /cannot route through its own/
   );
 });
@@ -40,7 +40,7 @@ test("rejects URLs, IPs, invalid IDs, and short proxy paths", () => {
 test("builds a Worker with no unresolved configuration placeholders", async () => {
   const source = await buildWorker(validateManifest(VALID_MANIFEST));
   assert.match(source, /"www\.example\.com":42/);
-  assert.match(source, /https:\/\/analytics\.boldmedia\.cc/);
+  assert.match(source, /https:\/\/analytics\.myfusionadmin\.com/);
   assert.doesNotMatch(source, /__[A-Z_]+__/);
 });
 

@@ -5,7 +5,7 @@ import { buildWorker, validateManifest } from "../scripts/lib.mjs";
 
 const manifest = validateManifest({
   version: 1,
-  analyticsOrigin: "https://analytics.boldmedia.cc",
+  analyticsOrigin: "https://analytics.myfusionadmin.com",
   pathPrefix: "/__bold-analytics",
   sites: [{ hostname: "www.example.com", siteId: 42 }],
 });
@@ -40,7 +40,7 @@ test("worker proxies the reserved same-origin path to the analytics API", async 
     const response = await worker.default.fetch(
       new Request("https://www.example.com/__bold-analytics/script.js?cache=1")
     );
-    assert.equal(upstream.url, "https://analytics.boldmedia.cc/api/script.js?cache=1");
+    assert.equal(upstream.url, "https://analytics.myfusionadmin.com/api/script.js?cache=1");
     assert.equal(response.headers.get("x-bold-analytics-proxy"), "1");
     assert.equal(await response.text(), "tracker");
   } finally {
