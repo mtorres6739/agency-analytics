@@ -115,6 +115,8 @@ Every handler validates Zod input, verifies organization membership, derives acc
 
 Tracking installation uses two provider adapters with the same contract: explicit domain-to-site mapping, read-only plan, apply, installation verification, event verification, and rollback.
 
+Deployment records use the internal numeric `site_id` for tenancy and job identity. Generated browser tracking always uses the site's public `sites.id` property token; the internal database ID must never be emitted as `data-site-id`.
+
 ### Cloudflare edge adapter
 
 - `infra/tracking-edge` targets websites already proxied through Cloudflare, regardless of whether the origin is WordPress or Vercel.

@@ -167,7 +167,7 @@ class GitHubClient extends ApiClient {
   createPullRequest(
     owner: string,
     repo: string,
-    input: { branch: string; base: string; hostname: string; siteId: number; analyticsOrigin: string }
+    input: { branch: string; base: string; hostname: string; trackingId: string; analyticsOrigin: string }
   ) {
     return this.request(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`, {
       method: "POST",
@@ -175,7 +175,7 @@ class GitHubClient extends ApiClient {
         title: "Add Agency Analytics tracking",
         head: input.branch,
         base: input.base,
-        body: `Installs the managed Agency Analytics tracker for **${input.hostname}** (site ID \`${input.siteId}\`).\n\nVercel will create a preview deployment. Verify a browser event in ${input.analyticsOrigin} before merging.`,
+        body: `Installs the managed Agency Analytics tracker for **${input.hostname}** (property ID \`${input.trackingId}\`).\n\nVercel will create a preview deployment. Verify a browser event in ${input.analyticsOrigin} before merging.`,
       }),
     });
   }
@@ -218,8 +218,19 @@ export function supportsClientInstrumentation(version: string | undefined) {
   return major > 15 || (major === 15 && minor >= 3);
 }
 
-export function buildInstrumentation(analyticsOrigin: string, siteId: number) {
-  return `// Agency Analytics managed tracker. Changes are overwritten by the installer.\nconst existing = document.querySelector('script[data-agency-analytics="managed"]');\n\nif (!existing) {\n  const script = document.createElement("script");\n  script.src = "${analyticsOrigin}/api/script.js";\n  script.setAttribute("data-site-id", "${siteId}");\n  script.setAttribute("data-agency-analytics", "managed");\n  script.defer = true;\n  document.head.appendChild(script);\n}\n`;
+export function buildInstrumentation(analyticsOrigin: string, trackingId: string) {
+  return `// Agency Analytics managed tracker. Changes are overwritten by the installer.\nconst existing = document.querySelector('script[data-agency-analytics="managed"]');\n\nif (!existing) {\n  const script = document.createElement("script");\n  script.src = "${analyticsOrigin}/api/script.js";\n  script.setAttribute("data-site-id", "${trackingId}");\n  script.setAttribute("data-agency-analytics", "managed");\n  script.defer = true;\n  document.head.appendChild(script);\n}\n`;
+}
+
+export function hasManagedInstrumentation(source: string, analyticsOrigin: string, trackingId: string) {
+  const originPresent = source.includes(`${analyticsOrigin}/api/script.js`);
+  const trackingIdPresent = source.includes(`"${trackingId}"`) || source.includes(`'${trackingId}'`);
+  const markerPresent =
+    source.includes('data-agency-analytics="managed"') ||
+    source.includes("data-agency-analytics='managed'") ||
+    /agencyAnalytics\s*=\s*["']managed["']/.test(source) ||
+    /setAttribute\(\s*["']data-agency-analytics["']\s*,\s*["']managed["']\s*\)/.test(source);
+  return originPresent && trackingIdPresent && markerPresent;
 }
 
 function cspAllowsOrigin(policy: string | null, directiveName: string, origin: string) {
@@ -289,7 +300,7 @@ export class VercelTrackingProvider {
     const tsconfig = await this.github.getContent(owner, repo, joinPath(root, "tsconfig.json"), base);
     const filePath = joinPath(root, sourceRoot, `instrumentation-client.${tsconfig ? "ts" : "js"}`);
     const existing = await this.github.getContent(owner, repo, filePath, base);
-    const desired = buildInstrumentation(this.config.analyticsOrigin, site.siteId);
+    const desired = buildInstrumentation(this.config.analyticsOrigin, site.trackingId);
     const existingContent = existing?.content ? decodeContent(existing) : null;
     const homepage = await this.fetchImpl(`https://${site.hostname}/`, { method: "HEAD", redirect: "follow" }).catch(
       () => null
@@ -303,8 +314,12 @@ export class VercelTrackingProvider {
       base,
       filePath,
       branch: `codex/agency-analytics-${site.siteId}`,
-      installed: existingContent === desired,
-      conflict: Boolean(existingContent && existingContent !== desired),
+      installed: Boolean(
+        existingContent && hasManagedInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId)
+      ),
+      conflict: Boolean(
+        existingContent && !hasManagedInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId)
+      ),
       cspCompatible: trackerCspCompatible(
         homepage?.headers.get("content-security-policy") ?? null,
         this.config.analyticsOrigin
@@ -361,7 +376,7 @@ export class VercelTrackingProvider {
       branch: item.branch,
       base: item.base,
       hostname: item.site.hostname,
-      siteId: item.site.siteId,
+      trackingId: item.site.trackingId,
       analyticsOrigin: this.config.analyticsOrigin,
     });
   }

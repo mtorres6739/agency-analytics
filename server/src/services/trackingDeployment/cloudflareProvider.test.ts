@@ -46,7 +46,7 @@ describe("CloudflareTrackingProvider", () => {
       if (url === "https://www.example.com/") {
         return new Response(
           installed
-            ? '<html><head><script src="/__agency-analytics/script.js" data-site-id="42"></script></head></html>'
+            ? '<html><head><script src="/__agency-analytics/script.js" data-site-id="public-42"></script></head></html>'
             : "<html><head></head></html>",
           { status: 200, headers: { "content-type": "text/html" } }
         );
@@ -60,7 +60,7 @@ describe("CloudflareTrackingProvider", () => {
       throw new Error(`Unexpected request: ${url}`);
     }) as unknown as typeof fetch;
     const tracking = provider(fetchImpl);
-    const site = { hostname: "www.example.com", siteId: 42 };
+    const site = { hostname: "www.example.com", siteId: 42, trackingId: "public-42" };
 
     await expect(tracking.plan(site)).resolves.toMatchObject({
       provider: "cloudflare",
@@ -86,7 +86,9 @@ describe("CloudflareTrackingProvider", () => {
       throw new Error(`Unexpected request: ${url}`);
     }) as unknown as typeof fetch;
 
-    await expect(provider(fetchImpl).plan({ hostname: "www.example.com", siteId: 42 })).resolves.toMatchObject({
+    await expect(
+      provider(fetchImpl).plan({ hostname: "www.example.com", siteId: 42, trackingId: "public-42" })
+    ).resolves.toMatchObject({
       blocked: true,
       reason: expect.stringContaining("existing Worker route"),
     });

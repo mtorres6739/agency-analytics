@@ -72,6 +72,7 @@ async function getDeploymentContext(deploymentId: string) {
       deployment: trackingDeployments,
       organizationId: agencyClients.organizationId,
       hostname: sites.domain,
+      trackingId: sites.id,
       assignmentId: agencyClientSites.id,
     })
     .from(trackingDeployments)
@@ -166,7 +167,12 @@ export class TrackingDeploymentService {
 
     try {
       const input = context.deployment.input as DeploymentInput;
-      const site = { hostname: context.hostname.toLowerCase(), siteId: context.deployment.siteId };
+      if (!context.trackingId) throw new Error("The website does not have a public tracking property ID");
+      const site = {
+        hostname: context.hostname.toLowerCase(),
+        siteId: context.deployment.siteId,
+        trackingId: context.trackingId,
+      };
       let result: Record<string, any>;
       if (context.deployment.action === "plan") result = await this.plan(site, input);
       else if (context.deployment.action === "apply") result = await this.apply(site, input);

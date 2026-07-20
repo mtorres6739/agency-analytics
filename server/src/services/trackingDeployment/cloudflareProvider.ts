@@ -1,6 +1,6 @@
 type Fetch = typeof fetch;
 
-export type TrackingSite = { hostname: string; siteId: number };
+export type TrackingSite = { hostname: string; siteId: number; trackingId: string };
 
 type CloudflareConfig = {
   token: string;
@@ -50,7 +50,7 @@ function routePatternCoversHostname(pattern: string, hostname: string) {
 }
 
 function buildWorker(config: CloudflareConfig, site: TrackingSite) {
-  return WORKER_TEMPLATE.replace("__SITE_MAP_JSON__", JSON.stringify({ [site.hostname]: site.siteId }))
+  return WORKER_TEMPLATE.replace("__SITE_MAP_JSON__", JSON.stringify({ [site.hostname]: site.trackingId }))
     .replace("__ANALYTICS_ORIGIN_JSON__", JSON.stringify(config.analyticsOrigin))
     .replace("__PATH_PREFIX_JSON__", JSON.stringify(config.pathPrefix));
 }
@@ -173,7 +173,7 @@ export class CloudflareTrackingProvider {
       redirect: "follow",
     });
     const injected =
-      html.includes(`${this.config.pathPrefix}/script.js`) && html.includes(`data-site-id="${site.siteId}"`);
+      html.includes(`${this.config.pathPrefix}/script.js`) && html.includes(`data-site-id="${site.trackingId}"`);
     const proxied =
       script.ok &&
       ["1"].includes(
