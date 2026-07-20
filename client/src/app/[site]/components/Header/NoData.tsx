@@ -33,13 +33,15 @@ import {
   SiWoocommerce,
   SiWordpress,
 } from "@icons-pack/react-simple-icons";
-import { ChevronRight } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, Loader2 } from "lucide-react";
 import { useExtracted } from "next-intl";
 import React, { useState } from "react";
+import { useLatestSiteTrackingDeployment } from "../../../../api/agency/hooks/useAgencyClients";
 import { useGetSite, useSiteHasData } from "../../../../api/admin/hooks/useSites";
 import { CodeSnippet } from "../../../../components/CodeSnippet";
 import { ExternalLink } from "../../../../components/ExternalLink";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
+import { authClient } from "../../../../lib/auth";
 import { useStore } from "../../../../lib/store";
 
 const ICON = "h-3.5 w-3.5";
@@ -122,8 +124,14 @@ export function NoData() {
   const [showJsFallback, setShowJsFallback] = useState(false);
   const { data: siteHasData, isLoading } = useSiteHasData(site);
   const { data: siteMetadata, isLoading: isLoadingSiteMetadata } = useGetSite(site);
+  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const numericSiteId = Number(site);
+  const managedTracking = useLatestSiteTrackingDeployment(
+    activeOrganization?.id,
+    Number.isSafeInteger(numericSiteId) ? numericSiteId : undefined
+  );
 
-  if (siteHasData || isLoading || isLoadingSiteMetadata) {
+  if (siteHasData || isLoading || isLoadingSiteMetadata || managedTracking.isLoading) {
     return null;
   }
 
@@ -132,6 +140,73 @@ export function NoData() {
 
   const isMobileSite = siteMetadata?.type === "mobile";
   const siteId = siteMetadata?.id ?? siteMetadata?.siteId;
+  const deployment = managedTracking.data?.deployment;
+
+  if (!isMobileSite && deployment) {
+    const working = ["queued", "running"].includes(deployment.status);
+    const complete = deployment.status === "succeeded";
+    const failed = ["blocked", "failed"].includes(deployment.status);
+    const title = working
+      ? t("Installing analytics automatically")
+      : complete
+        ? t("Analytics was installed automatically")
+        : t("Automatic installation needs attention");
+    const description = working
+      ? t(
+          "We are detecting the hosting provider, updating the website, and checking the deployment. Nothing needs to be copied."
+        )
+      : complete
+        ? t(
+            "The website update is complete. Open the live site once and this dashboard will populate when the first pageview arrives."
+          )
+        : String(
+            deployment.errorSummary ||
+              deployment.result.reason ||
+              t("The website could not be changed safely. Review the managed deployment for the exact blocker.")
+          );
+
+    return (
+      <section className="mt-4 rounded-lg border border-neutral-100 bg-white p-5 dark:border-neutral-850 dark:bg-neutral-900">
+        <div className="flex items-start gap-3">
+          <span
+            className={`mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full ${
+              working
+                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200"
+                : complete
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                  : "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+            }`}
+          >
+            {working ? (
+              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            ) : complete ? (
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+            ) : (
+              <AlertTriangle className="size-4" aria-hidden="true" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{title}</h2>
+              <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium capitalize text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                {deployment.result.provider || deployment.provider}
+              </span>
+            </div>
+            <p className="mt-1 text-sm leading-6 text-neutral-600 dark:text-neutral-400">{description}</p>
+            {failed ? (
+              <a
+                href={`/clients/${deployment.clientId}`}
+                className={`mt-3 inline-flex rounded-md text-sm font-semibold text-neutral-900 hover:underline dark:text-neutral-100 ${FOCUS_RING}`}
+              >
+                {t("View managed deployment")}
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const scriptUrl = `${globalThis.location.origin}/api/script.js`;
 
   const htmlSnippet = `<script\n    src="${scriptUrl}"\n    data-site-id="${siteId}"\n    defer\n></script>`;

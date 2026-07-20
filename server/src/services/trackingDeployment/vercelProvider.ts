@@ -29,6 +29,17 @@ type Inspection = {
   conflict: boolean;
   cspCompatible: boolean;
   desired: string;
+  baseContent: string | null;
+  existingSha?: string;
+  deploymentMode: "instrumentation-client" | "app-layout";
+  additionalFiles: ManagedFile[];
+};
+
+type ManagedFile = {
+  filePath: string;
+  desired: string;
+  baseContent: string | null;
+  existingSha?: string;
 };
 
 class ApiError extends Error {
@@ -109,10 +120,16 @@ class VercelClient extends ApiClient {
     return null;
   }
 
-  async findBranchDeployment(projectId: string, branch: string) {
+  async findBranchDeployment(projectId: string, branch: string, commitSha?: string) {
     const query = new URLSearchParams({ projectId, limit: "20" });
     const payload = await this.request(this.scoped(`/v6/deployments?${query}`));
-    return payload.deployments?.find((deployment: any) => deployment.meta?.githubCommitRef === branch) ?? null;
+    return (
+      payload.deployments?.find(
+        (deployment: any) =>
+          deployment.meta?.githubCommitRef === branch &&
+          (!commitSha || deployment.meta?.githubCommitSha === commitSha)
+      ) ?? null
+    );
   }
 }
 
@@ -145,7 +162,7 @@ class GitHubClient extends ApiClient {
     });
   }
 
-  putFile(owner: string, repo: string, filePath: string, branch: string, content: string) {
+  putFile(owner: string, repo: string, filePath: string, branch: string, content: string, sha?: string) {
     return this.request(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodePath(filePath)}`,
       {
@@ -154,6 +171,7 @@ class GitHubClient extends ApiClient {
           message: "feat: add Agency Analytics tracking",
           content: Buffer.from(content).toString("base64"),
           branch,
+          ...(sha ? { sha } : {}),
         }),
       }
     );
@@ -184,6 +202,13 @@ class GitHubClient extends ApiClient {
     return this.request(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${number}`, {
       method: "PATCH",
       body: JSON.stringify({ state }),
+    });
+  }
+
+  mergePullRequest(owner: string, repo: string, number: number) {
+    return this.request(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${number}/merge`, {
+      method: "PUT",
+      body: JSON.stringify({ merge_method: "squash" }),
     });
   }
 
@@ -222,6 +247,43 @@ export function buildInstrumentation(analyticsOrigin: string, trackingId: string
   return `// Agency Analytics managed tracker. Changes are overwritten by the installer.\nconst existing = document.querySelector('script[data-agency-analytics="managed"]');\n\nif (!existing) {\n  const script = document.createElement("script");\n  script.src = "${analyticsOrigin}/api/script.js";\n  script.setAttribute("data-site-id", "${trackingId}");\n  script.setAttribute("data-agency-analytics", "managed");\n  script.defer = true;\n  document.head.appendChild(script);\n}\n`;
 }
 
+export function buildAppLayoutInstrumentation(source: string, analyticsOrigin: string, trackingId: string) {
+  if (hasManagedInstrumentation(source, analyticsOrigin, trackingId)) return source;
+  if (/data-agency-analytics\s*=/.test(source)) {
+    throw new Error("The app layout already contains a different managed analytics tracker");
+  }
+  const body = source.match(/<body\b[\s\S]*?>/);
+  if (!body?.index && body?.index !== 0) throw new Error("The Next.js app layout does not contain a body element");
+
+  const quote = source.match(/from\s+(['"])/)?.[1] ?? '"';
+  const importLine = `import Script from ${quote}next/script${quote};\n`;
+  const withImport = /from\s+["']next\/script["']/.test(source) ? source : `${importLine}${source}`;
+  const bodyAfterImport = withImport.match(/<body\b[\s\S]*?>/);
+  if (!bodyAfterImport?.index && bodyAfterImport?.index !== 0) {
+    throw new Error("The Next.js app layout does not contain a body element");
+  }
+  const insertionPoint = bodyAfterImport.index + bodyAfterImport[0].length;
+  const tracker = `\n        <Script\n          src=${quote}${analyticsOrigin}/api/script.js${quote}\n          data-site-id=${quote}${trackingId}${quote}\n          data-agency-analytics=${quote}managed${quote}\n          strategy=${quote}afterInteractive${quote}\n        />`;
+  return `${withImport.slice(0, insertionPoint)}${tracker}${withImport.slice(insertionPoint)}`;
+}
+
+function directiveContainsOrigin(source: string, directive: string, analyticsOrigin: string) {
+  return source.split(/\r?\n/).some(line => line.includes(directive) && line.includes(analyticsOrigin));
+}
+
+export function buildNextConfigCspAllowance(source: string, analyticsOrigin: string) {
+  let next = source;
+  for (const directive of ["script-src", "connect-src"]) {
+    if (directiveContainsOrigin(next, directive, analyticsOrigin)) continue;
+    const pattern = new RegExp(`(["'\\\`])(${directive}\\s+[^\\r\\n]*?)(\\1)(?=,|;|\\)|\\]|$)`, "m");
+    next = next.replace(
+      pattern,
+      (_match, quote: string, value: string) => `${quote}${value} ${analyticsOrigin}${quote}`
+    );
+  }
+  return next;
+}
+
 export function hasManagedInstrumentation(source: string, analyticsOrigin: string, trackingId: string) {
   const originPresent = source.includes(`${analyticsOrigin}/api/script.js`);
   const trackingIdPresent = source.includes(`"${trackingId}"`) || source.includes(`'${trackingId}'`);
@@ -231,6 +293,14 @@ export function hasManagedInstrumentation(source: string, analyticsOrigin: strin
     /agencyAnalytics\s*=\s*["']managed["']/.test(source) ||
     /setAttribute\(\s*["']data-agency-analytics["']\s*,\s*["']managed["']\s*\)/.test(source);
   return originPresent && trackingIdPresent && markerPresent;
+}
+
+function hasManagedMarker(source: string) {
+  return (
+    /data-agency-analytics\s*=/.test(source) ||
+    /setAttribute\(\s*["']data-agency-analytics["']/.test(source) ||
+    /agencyAnalytics\s*=/.test(source)
+  );
 }
 
 function cspAllowsOrigin(policy: string | null, directiveName: string, origin: string) {
@@ -288,23 +358,75 @@ export class VercelTrackingProvider {
     if (!packageItem?.content) throw new Error(`package.json was not found for ${project.name}`);
     const packageJson = JSON.parse(decodeContent(packageItem));
     const nextVersion = packageJson.dependencies?.next ?? packageJson.devDependencies?.next;
-    if (!supportsClientInstrumentation(nextVersion)) {
-      throw new Error(
-        `${project.name} uses Next.js ${nextVersion ?? "unknown"}; automatic installation requires 15.3+`
-      );
-    }
 
     const srcApp = await this.github.getContent(owner, repo, joinPath(root, "src", "app"), base);
     const srcPages = srcApp ? null : await this.github.getContent(owner, repo, joinPath(root, "src", "pages"), base);
     const sourceRoot = srcApp || srcPages ? "src" : "";
     const tsconfig = await this.github.getContent(owner, repo, joinPath(root, "tsconfig.json"), base);
-    const filePath = joinPath(root, sourceRoot, `instrumentation-client.${tsconfig ? "ts" : "js"}`);
-    const existing = await this.github.getContent(owner, repo, filePath, base);
-    const desired = buildInstrumentation(this.config.analyticsOrigin, site.trackingId);
-    const existingContent = existing?.content ? decodeContent(existing) : null;
+    const useClientInstrumentation = supportsClientInstrumentation(nextVersion);
+    let filePath: string;
+    let existing: any;
+    let existingContent: string | null;
+    let desired: string;
+    let deploymentMode: Inspection["deploymentMode"];
+
+    if (useClientInstrumentation) {
+      filePath = joinPath(root, sourceRoot, `instrumentation-client.${tsconfig ? "ts" : "js"}`);
+      existing = await this.github.getContent(owner, repo, filePath, base);
+      existingContent = existing?.content ? decodeContent(existing) : null;
+      desired = buildInstrumentation(this.config.analyticsOrigin, site.trackingId);
+      deploymentMode = "instrumentation-client";
+    } else {
+      if (!srcApp) {
+        throw new Error(
+          `${project.name} uses Next.js ${nextVersion ?? "unknown"}; automatic installation below 15.3 requires the App Router`
+        );
+      }
+      const candidates = ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"];
+      let layout: any;
+      filePath = "";
+      for (const candidate of candidates) {
+        const candidatePath = joinPath(root, sourceRoot, "app", candidate);
+        layout = await this.github.getContent(owner, repo, candidatePath, base);
+        if (layout?.content) {
+          filePath = candidatePath;
+          break;
+        }
+      }
+      if (!layout?.content || !filePath) throw new Error(`${project.name} does not have a supported App Router layout`);
+      existing = layout;
+      existingContent = decodeContent(layout);
+      desired = buildAppLayoutInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId);
+      deploymentMode = "app-layout";
+    }
     const homepage = await this.fetchImpl(`https://${site.hostname}/`, { method: "HEAD", redirect: "follow" }).catch(
       () => null
     );
+    const policy = homepage?.headers.get("content-security-policy") ?? null;
+    let cspCompatible = trackerCspCompatible(policy, this.config.analyticsOrigin);
+    const additionalFiles: ManagedFile[] = [];
+    if (!cspCompatible) {
+      for (const candidate of ["next.config.ts", "next.config.mjs", "next.config.js"]) {
+        const configPath = joinPath(root, candidate);
+        const configFile = await this.github.getContent(owner, repo, configPath, base);
+        if (!configFile?.content) continue;
+        const baseContent = decodeContent(configFile);
+        const desiredConfig = buildNextConfigCspAllowance(baseContent, this.config.analyticsOrigin);
+        if (
+          directiveContainsOrigin(desiredConfig, "script-src", this.config.analyticsOrigin) &&
+          directiveContainsOrigin(desiredConfig, "connect-src", this.config.analyticsOrigin)
+        ) {
+          additionalFiles.push({
+            filePath: configPath,
+            desired: desiredConfig,
+            baseContent,
+            existingSha: configFile.sha,
+          });
+          cspCompatible = true;
+        }
+        break;
+      }
+    }
 
     return {
       site,
@@ -318,13 +440,16 @@ export class VercelTrackingProvider {
         existingContent && hasManagedInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId)
       ),
       conflict: Boolean(
-        existingContent && !hasManagedInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId)
+        existingContent &&
+        (deploymentMode === "instrumentation-client" || hasManagedMarker(existingContent)) &&
+        !hasManagedInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId)
       ),
-      cspCompatible: trackerCspCompatible(
-        homepage?.headers.get("content-security-policy") ?? null,
-        this.config.analyticsOrigin
-      ),
+      cspCompatible,
       desired,
+      baseContent: existingContent,
+      existingSha: existing?.sha,
+      deploymentMode,
+      additionalFiles,
     };
   }
 
@@ -345,6 +470,8 @@ export class VercelTrackingProvider {
       repository: `${item.owner}/${item.repo}`,
       filePath: item.filePath,
       branch: item.branch,
+      deploymentMode: item.deploymentMode,
+      files: [item.filePath, ...item.additionalFiles.map(file => file.filePath)],
     };
   }
 
@@ -352,9 +479,23 @@ export class VercelTrackingProvider {
     return this.publicPlan(await this.inspect(site, projectName));
   }
 
+  private async putManagedFile(item: Inspection, file: ManagedFile) {
+    const branchFile = await this.github.getContent(item.owner, item.repo, file.filePath, item.branch);
+    if (!branchFile) {
+      await this.github.putFile(item.owner, item.repo, file.filePath, item.branch, file.desired);
+      return;
+    }
+    const branchContent = decodeContent(branchFile);
+    if (branchContent === file.desired) return;
+    if (file.baseContent !== null && branchContent === file.baseContent) {
+      await this.github.putFile(item.owner, item.repo, file.filePath, item.branch, file.desired, branchFile.sha);
+      return;
+    }
+    throw new Error(`${item.owner}/${item.repo}:${item.branch} already contains a different ${file.filePath}`);
+  }
+
   private async ensurePullRequest(item: Inspection) {
     const existingPullRequests = await this.github.listPullRequests(item.owner, item.repo, item.branch);
-    if (existingPullRequests[0]) return existingPullRequests[0];
 
     let branch;
     try {
@@ -366,11 +507,16 @@ export class VercelTrackingProvider {
       const baseRef = await this.github.getBranch(item.owner, item.repo, item.base);
       await this.github.createBranch(item.owner, item.repo, item.branch, baseRef.object.sha);
     }
-    const branchFile = await this.github.getContent(item.owner, item.repo, item.filePath, item.branch);
-    if (!branchFile) {
-      await this.github.putFile(item.owner, item.repo, item.filePath, item.branch, item.desired);
-    } else if (decodeContent(branchFile) !== item.desired) {
-      throw new Error(`${item.owner}/${item.repo}:${item.branch} already contains a different ${item.filePath}`);
+    await this.putManagedFile(item, {
+      filePath: item.filePath,
+      desired: item.desired,
+      baseContent: item.baseContent,
+      existingSha: item.existingSha,
+    });
+    for (const file of item.additionalFiles) await this.putManagedFile(item, file);
+    if (existingPullRequests[0]) {
+      const refreshed = await this.github.listPullRequests(item.owner, item.repo, item.branch);
+      return refreshed[0];
     }
     return this.github.createPullRequest(item.owner, item.repo, {
       branch: item.branch,
@@ -381,18 +527,40 @@ export class VercelTrackingProvider {
     });
   }
 
-  async apply(site: TrackingSite, projectName?: string) {
+  private async waitForReadyPreview(projectId: string, branch: string, commitSha?: string) {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const deployment = await this.vercel.findBranchDeployment(projectId, branch, commitSha);
+      if (deployment?.readyState === "READY") return deployment;
+      if (["ERROR", "CANCELED"].includes(deployment?.readyState)) {
+        throw new Error(`The Vercel preview finished with ${deployment.readyState}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 5_000));
+    }
+    throw new Error("The Vercel preview did not become ready within five minutes");
+  }
+
+  async apply(site: TrackingSite, projectName?: string, options: { autoMerge?: boolean } = {}) {
     const item = await this.inspect(site, projectName);
     const plan = this.publicPlan(item);
     if (plan.blocked) return plan;
     if (item.installed) return plan;
     const pullRequest = await this.ensurePullRequest(item);
-    const deployment = await this.vercel.findBranchDeployment(item.project.id, item.branch);
+    const deployment = options.autoMerge
+      ? await this.waitForReadyPreview(item.project.id, item.branch, pullRequest.head?.sha)
+      : await this.vercel.findBranchDeployment(item.project.id, item.branch);
+    let merge: any;
+    if (options.autoMerge) {
+      merge = await this.github.mergePullRequest(item.owner, item.repo, pullRequest.number);
+      if (!merge?.merged) throw new Error(merge?.message || "GitHub did not merge the tracking pull request");
+    }
     return {
       ...plan,
+      installed: options.autoMerge ? true : plan.installed,
       pullRequestUrl: pullRequest.html_url,
       previewUrl: deployment?.url ? `https://${deployment.url}` : undefined,
       previewState: deployment?.readyState ?? "QUEUED",
+      autoMerged: options.autoMerge === true,
+      mergeCommitSha: merge?.sha,
     };
   }
 

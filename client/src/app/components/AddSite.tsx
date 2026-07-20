@@ -348,7 +348,9 @@ export function AddSite({ trigger, disabled }: { trigger?: React.ReactNode; disa
               {t("Add Site")}
             </DialogTitle>
             <DialogDescription>
-              {t("Track analytics for a new website or React Native app in your organization")}
+              {t(
+                "Track analytics for a new website or React Native app in your organization. Website installation starts automatically after creation."
+              )}
             </DialogDescription>
           </DialogHeader>
 

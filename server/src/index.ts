@@ -24,6 +24,7 @@ import {
   getAgencyClient,
   getAgencyClientOnboarding,
   getAgencyClientSummary,
+  getLatestSiteTrackingDeployment,
   listAgencyClients,
   listReportRuns,
   listReportSchedules,
@@ -529,6 +530,11 @@ async function agencyRoutes(fastify: FastifyInstance) {
   fastify.get("/organizations/:organizationId/clients/:clientId", orgOrgRead, getAgencyClient);
   fastify.patch("/organizations/:organizationId/clients/:clientId", orgAdminOrgWrite, updateAgencyClient);
   fastify.post("/organizations/:organizationId/clients/:clientId/sites", orgAdminOrgWrite, assignAgencyClientSite);
+  fastify.get(
+    "/organizations/:organizationId/sites/:siteId/tracking-deployment",
+    orgOrgRead,
+    getLatestSiteTrackingDeployment
+  );
   fastify.delete(
     "/organizations/:organizationId/clients/:clientId/sites/:siteId",
     orgAdminOrgWrite,

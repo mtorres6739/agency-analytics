@@ -4,6 +4,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { db } from "../../db/postgres/postgres.js";
 import { sites } from "../../db/postgres/schema.js";
 import { IS_CLOUD } from "../../lib/const.js";
+import { autoOnboardManagedSite } from "../../services/trackingDeployment/managedSiteOnboarding.js";
 import { getSubscriptionInner } from "../stripe/getSubscription.js";
 
 export async function addSite(
@@ -161,7 +162,20 @@ export async function addSite(
       })
       .returning();
 
-    return reply.status(201).send(newSite[0]);
+    let managedTracking = null;
+    if (siteType === "web") {
+      try {
+        managedTracking = await autoOnboardManagedSite({
+          organizationId,
+          site: { siteId: newSite[0].siteId, name: newSite[0].name },
+          actorUserId: userId ?? null,
+        });
+      } catch (error) {
+        request.log?.error({ error, siteId: newSite[0].siteId }, "Failed to start managed tracking onboarding");
+      }
+    }
+
+    return reply.status(201).send({ ...newSite[0], managedTracking });
   } catch (error) {
     console.error("Error adding site:", error);
     return reply.status(500).send({

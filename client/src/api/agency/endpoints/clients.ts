@@ -62,6 +62,12 @@ export function fetchTrackingDeployments(organizationId: string, clientId: strin
   return authedFetch<{ deployments: TrackingDeployment[] }>(trackingDeploymentPath(organizationId, clientId, siteId));
 }
 
+export function fetchLatestSiteTrackingDeployment(organizationId: string, siteId: number) {
+  return authedFetch<{ deployment: TrackingDeployment | null }>(
+    `/organizations/${organizationId}/sites/${siteId}/tracking-deployment`
+  );
+}
+
 export function planTrackingDeployment(
   organizationId: string,
   clientId: string,

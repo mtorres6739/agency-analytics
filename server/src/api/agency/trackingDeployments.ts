@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { db } from "../../db/postgres/postgres.js";
 import { agencyAuditEvents, agencyClientSites, agencyClients, trackingDeployments } from "../../db/postgres/schema.js";
 import { trackingDeploymentService } from "../../services/trackingDeployment/trackingDeploymentService.js";
-import { getAgencyPrincipal } from "./access.js";
+import { canAccessClient, getAgencyPrincipal } from "./access.js";
 import { trackingDeploymentPlanSchema } from "./schemas.js";
 
 type SiteParams = { organizationId: string; clientId: string; siteId: string };
@@ -122,6 +122,39 @@ export async function listTrackingDeployments(request: FastifyRequest<{ Params: 
     .orderBy(desc(trackingDeployments.createdAt))
     .limit(20);
   return reply.send({ deployments: deployments.map(serialize) });
+}
+
+export async function getLatestSiteTrackingDeployment(
+  request: FastifyRequest<{ Params: { organizationId: string; siteId: string } }>,
+  reply: FastifyReply
+) {
+  const siteId = Number(request.params.siteId);
+  if (!Number.isSafeInteger(siteId) || siteId <= 0) return reply.status(404).send({ error: "Website not found" });
+
+  const [assignment] = await db
+    .select({ clientId: agencyClientSites.clientId })
+    .from(agencyClientSites)
+    .innerJoin(agencyClients, eq(agencyClients.id, agencyClientSites.clientId))
+    .where(and(eq(agencyClients.organizationId, request.params.organizationId), eq(agencyClientSites.siteId, siteId)))
+    .limit(1);
+  if (!assignment) return reply.send({ deployment: null });
+
+  const access = await canAccessClient(request, request.params.organizationId, assignment.clientId);
+  if (!access.allowed) return reply.status(404).send({ error: "Website not found" });
+
+  const [deployment] = await db
+    .select()
+    .from(trackingDeployments)
+    .where(
+      and(
+        eq(trackingDeployments.organizationId, request.params.organizationId),
+        eq(trackingDeployments.clientId, assignment.clientId),
+        eq(trackingDeployments.siteId, siteId)
+      )
+    )
+    .orderBy(desc(trackingDeployments.createdAt))
+    .limit(1);
+  return reply.send({ deployment: deployment ? serialize(deployment) : null });
 }
 
 export async function planTrackingDeployment(

@@ -19,7 +19,12 @@ vi.mock("../../lib/auth-utils.js", () => ({
 }));
 
 import { sql } from "../../db/postgres/postgres.js";
-import { applyTrackingDeployment, listTrackingDeployments, planTrackingDeployment } from "./trackingDeployments.js";
+import {
+  applyTrackingDeployment,
+  getLatestSiteTrackingDeployment,
+  listTrackingDeployments,
+  planTrackingDeployment,
+} from "./trackingDeployments.js";
 
 const DDL = `
 CREATE TABLE "member" ("id" text PRIMARY KEY, "organizationId" text NOT NULL, "userId" text NOT NULL, "role" text NOT NULL, "createdAt" timestamp DEFAULT now(), "has_restricted_site_access" boolean DEFAULT false NOT NULL);
@@ -104,5 +109,21 @@ describe("tracking deployment access and queueing", () => {
     await planTrackingDeployment(requestStub("owner", "client_1", "1", { preferredProvider: "ftp" }), reply);
     expect(reply.statusCode).toBe(400);
     expect(queueDeployment).not.toHaveBeenCalled();
+  });
+
+  it("returns the latest site deployment to an organization owner", async () => {
+    await (sql as any).exec(`
+      INSERT INTO "tracking_deployments" ("id", "organization_id", "client_id", "site_id", "provider", "action", "status", "created_at", "updated_at")
+      VALUES ('latest', 'org_1', 'client_1', 1, 'vercel', 'plan', 'running', now(), now());
+    `);
+    const reply = replyStub();
+    await getLatestSiteTrackingDeployment(requestStub("owner", "client_1", "1"), reply);
+    expect(reply.body.deployment).toMatchObject({ id: "latest", clientId: "client_1", siteId: 1, status: "running" });
+  });
+
+  it("does not expose site deployment state to an unrelated restricted member", async () => {
+    const reply = replyStub();
+    await getLatestSiteTrackingDeployment(requestStub("viewer", "client_1", "1"), reply);
+    expect(reply.statusCode).toBe(404);
   });
 });

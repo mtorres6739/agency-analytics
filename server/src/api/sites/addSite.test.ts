@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
 
 const mocks = vi.hoisted(() => ({
   getSubscriptionInner: vi.fn(),
+  autoOnboardManagedSite: vi.fn(),
 }));
 
 vi.mock("../../db/postgres/postgres.js", () => ({
@@ -40,6 +41,10 @@ vi.mock("../../lib/const.js", async importOriginal => {
 
 vi.mock("../stripe/getSubscription.js", () => ({
   getSubscriptionInner: mocks.getSubscriptionInner,
+}));
+
+vi.mock("../../services/trackingDeployment/managedSiteOnboarding.js", () => ({
+  autoOnboardManagedSite: mocks.autoOnboardManagedSite,
 }));
 
 import { addSite } from "./addSite.js";
@@ -76,6 +81,38 @@ beforeEach(() => {
   state.existingSiteCount = 0;
   state.insertedValues.length = 0;
   mocks.getSubscriptionInner.mockResolvedValue(subscription());
+  mocks.autoOnboardManagedSite.mockResolvedValue({
+    clientId: "client_1",
+    deploymentId: "deployment_1",
+    status: "queued",
+  });
+});
+
+describe("addSite — managed tracking onboarding", () => {
+  it("starts automatic onboarding for a website after creating it", async () => {
+    state.isCloud = false;
+    const reply = replyStub();
+
+    await addSite(makeRequest({ domain: "managed.example.com", name: "Managed Site" }), reply);
+
+    expect(reply.statusCode).toBe(201);
+    expect(mocks.autoOnboardManagedSite).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      site: { siteId: 1, name: "Managed Site" },
+      actorUserId: "u_1",
+    });
+    expect(reply.body.managedTracking.status).toBe("queued");
+  });
+
+  it("does not run browser tracking onboarding for a mobile app", async () => {
+    state.isCloud = false;
+    const reply = replyStub();
+
+    await addSite(makeRequest({ type: "mobile", domain: "com.example.app" }), reply);
+
+    expect(reply.statusCode).toBe(201);
+    expect(mocks.autoOnboardManagedSite).not.toHaveBeenCalled();
+  });
 });
 
 describe("addSite — cloud pro-feature gating (session replay)", () => {

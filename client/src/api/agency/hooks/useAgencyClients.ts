@@ -7,6 +7,7 @@ import {
   fetchAgencyClientOnboarding,
   fetchAgencyClientSummary,
   fetchAgencyClients,
+  fetchLatestSiteTrackingDeployment,
   fetchTrackingDeployments,
   planTrackingDeployment,
   refreshTrackingDeployment,
@@ -104,6 +105,18 @@ export function useTrackingDeployments(organizationId?: string, clientId?: strin
     enabled: !!organizationId && !!clientId && !!siteId,
     refetchInterval: query =>
       query.state.data?.deployments.some(deployment => ["queued", "running"].includes(deployment.status))
+        ? 1_500
+        : false,
+  });
+}
+
+export function useLatestSiteTrackingDeployment(organizationId?: string, siteId?: number) {
+  return useQuery({
+    queryKey: ["site-tracking-deployment", organizationId, siteId],
+    queryFn: () => fetchLatestSiteTrackingDeployment(organizationId!, siteId!),
+    enabled: !!organizationId && !!siteId,
+    refetchInterval: query =>
+      query.state.data?.deployment && ["queued", "running"].includes(query.state.data.deployment.status)
         ? 1_500
         : false,
   });

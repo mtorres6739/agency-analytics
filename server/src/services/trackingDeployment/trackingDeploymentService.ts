@@ -20,6 +20,8 @@ type DeploymentInput = {
   preferredProvider?: "auto" | "cloudflare" | "vercel" | "wordpress" | "manual";
   vercelProject?: string;
   sourceDeploymentId?: string;
+  autoApply?: boolean;
+  autoMerge?: boolean;
 };
 
 const redisConnection = () => ({
@@ -174,8 +176,13 @@ export class TrackingDeploymentService {
         trackingId: context.trackingId,
       };
       let result: Record<string, any>;
-      if (context.deployment.action === "plan") result = await this.plan(site, input);
-      else if (context.deployment.action === "apply") result = await this.apply(site, input);
+      if (context.deployment.action === "plan") {
+        const plan = await this.plan(site, input);
+        result =
+          input.autoApply && !plan.blocked && plan.supported && !plan.installed
+            ? await this.applyPlan(site, plan, input.autoMerge === true)
+            : plan;
+      } else if (context.deployment.action === "apply") result = await this.apply(site, input);
       else if (context.deployment.action === "status") result = await this.status(site, input);
       else result = await this.rollback(site, input);
 
@@ -188,7 +195,11 @@ export class TrackingDeploymentService {
           .set({ provider, status, result, completedAt, updatedAt: completedAt, errorSummary: null })
           .where(eq(trackingDeployments.id, context.deployment.id));
 
-        if (context.deployment.action === "apply" && status === "succeeded") {
+        if (
+          (context.deployment.action === "apply" ||
+            (context.deployment.action === "plan" && input.autoApply && result.autoApplied)) &&
+          status === "succeeded"
+        ) {
           await tx
             .update(agencyClientSites)
             .set({
@@ -277,6 +288,22 @@ export class TrackingDeploymentService {
     }
     if (source.siteId !== site.siteId) throw new Error("The source deployment belongs to another website");
     return source;
+  }
+
+  private async applyPlan(site: TrackingSite, plan: Record<string, any>, autoMerge: boolean) {
+    if (plan.provider === "cloudflare") {
+      const provider = cloudflareProvider();
+      const result = provider ? await provider.apply(site) : publicCredentialBlock(site, "cloudflare");
+      return { ...result, autoApplied: !result.blocked };
+    }
+    if (plan.provider === "vercel") {
+      const provider = vercelProvider();
+      const result = provider
+        ? await provider.apply(site, plan.project, { autoMerge })
+        : publicCredentialBlock(site, "vercel");
+      return { ...result, autoApplied: !result.blocked };
+    }
+    return { ...plan, blocked: true, supported: false, autoApplied: false };
   }
 
   private async apply(site: TrackingSite, input: DeploymentInput) {

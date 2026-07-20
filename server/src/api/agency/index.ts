@@ -12,6 +12,7 @@ export {
 export { createClientSchema, updateClientSchema, assignSiteSchema } from "./schemas.js";
 export {
   applyTrackingDeployment,
+  getLatestSiteTrackingDeployment,
   listTrackingDeployments,
   planTrackingDeployment,
   refreshTrackingDeployment,
