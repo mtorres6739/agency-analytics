@@ -16,6 +16,7 @@ import {
 } from "./api/admin/index.js";
 import {
   assignAgencyClientSite,
+  applyTrackingDeployment,
   createAgencyClient,
   createReportSchedule,
   deleteReportSchedule,
@@ -26,13 +27,18 @@ import {
   listAgencyClients,
   listReportRuns,
   listReportSchedules,
+  listTrackingDeployments,
+  planTrackingDeployment,
+  refreshTrackingDeployment,
   removeAgencyClientSite,
   retryReportRun,
+  rollbackTrackingDeployment,
   updateAgencyClient,
   updateReportSchedule,
   verifyAgencyClientSite,
 } from "./api/agency/index.js";
 import { agencyReportService } from "./services/agencyReports/reportService.js";
+import { trackingDeploymentService } from "./services/trackingDeployment/trackingDeploymentService.js";
 import {
   createDashboard,
   createFunnel,
@@ -533,6 +539,31 @@ async function agencyRoutes(fastify: FastifyInstance) {
     orgAdminOrgWrite,
     verifyAgencyClientSite
   );
+  fastify.get(
+    "/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments",
+    orgAdminOrgWrite,
+    listTrackingDeployments
+  );
+  fastify.post(
+    "/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments/plan",
+    orgAdminOrgWrite,
+    planTrackingDeployment
+  );
+  fastify.post(
+    "/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments/:deploymentId/apply",
+    orgAdminOrgWrite,
+    applyTrackingDeployment
+  );
+  fastify.post(
+    "/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments/:deploymentId/status",
+    orgAdminOrgWrite,
+    refreshTrackingDeployment
+  );
+  fastify.post(
+    "/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments/:deploymentId/rollback",
+    orgAdminOrgWrite,
+    rollbackTrackingDeployment
+  );
   fastify.get("/organizations/:organizationId/clients/:clientId/onboarding", orgOrgRead, getAgencyClientOnboarding);
   fastify.get("/organizations/:organizationId/clients/:clientId/summary", orgOrgRead, getAgencyClientSummary);
   fastify.get("/organizations/:organizationId/clients/:clientId/report-schedules", orgOrgRead, listReportSchedules);
@@ -650,6 +681,7 @@ const start = async () => {
       telemetryService.startTelemetryCron();
       usageService.startUsageCheckCron();
       await agencyReportService.initialize();
+      await trackingDeploymentService.initialize();
       if (IS_CLOUD && process.env.NODE_ENV !== "development") {
         weeklyReportService.startWeeklyReportCron();
         reengagementService.startReengagementCron();
@@ -717,6 +749,7 @@ const shutdown = async (signal: string) => {
     server.log.info("Server closed");
 
     await agencyReportService.shutdown();
+    await trackingDeploymentService.shutdown();
 
     // Shutdown uptime service
     // await uptimeService.shutdown();

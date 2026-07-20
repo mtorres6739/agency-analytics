@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { assignSiteSchema, createClientSchema, defaultSlug, reportScheduleSchema } from "./schemas.js";
+import {
+  assignSiteSchema,
+  createClientSchema,
+  defaultSlug,
+  reportScheduleSchema,
+  trackingDeploymentPlanSchema,
+} from "./schemas.js";
 
 describe("agency request schemas", () => {
   it("normalizes a client name into a stable slug", () => {
@@ -34,5 +40,16 @@ describe("agency request schemas", () => {
       recipients: [{ name: "Client", email: "client@example.com" }],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("defaults tracking installation to read-only provider detection", () => {
+    expect(trackingDeploymentPlanSchema.parse({})).toEqual({ preferredProvider: "auto" });
+  });
+
+  it("rejects unsafe Vercel project identifiers", () => {
+    expect(
+      trackingDeploymentPlanSchema.safeParse({ preferredProvider: "vercel", vercelProject: "../another-project" })
+        .success
+    ).toBe(false);
   });
 });

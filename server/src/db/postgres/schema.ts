@@ -348,6 +348,50 @@ export const agencyClientSites = pgTable(
   ]
 );
 
+// Durable state for privileged tracking installations. Provider credentials
+// are never stored here; input and result contain only public site metadata and
+// sanitized deployment output.
+export const trackingDeployments = pgTable(
+  "tracking_deployments",
+  {
+    id: text("id").primaryKey().notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => agencyClients.id, { onDelete: "cascade" }),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    action: text("action").notNull(),
+    status: text("status").notNull().default("queued"),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull().default({}),
+    result: jsonb("result").$type<Record<string, unknown>>().notNull().default({}),
+    errorSummary: text("error_summary"),
+    actorUserId: text("actor_user_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+    startedAt: timestamp("started_at", { mode: "string" }),
+    completedAt: timestamp("completed_at", { mode: "string" }),
+  },
+  table => [
+    index("tracking_deployments_site_created_idx").on(table.siteId, table.createdAt),
+    index("tracking_deployments_client_idx").on(table.clientId),
+    index("tracking_deployments_status_idx").on(table.status),
+    check(
+      "tracking_deployments_provider_check",
+      sql`${table.provider} IN ('cloudflare', 'vercel', 'wordpress', 'manual')`
+    ),
+    check("tracking_deployments_action_check", sql`${table.action} IN ('plan', 'apply', 'status', 'rollback')`),
+    check(
+      "tracking_deployments_status_check",
+      sql`${table.status} IN ('queued', 'running', 'succeeded', 'failed', 'blocked')`
+    ),
+  ]
+);
+
 export const reportSchedules = pgTable(
   "report_schedules",
   {

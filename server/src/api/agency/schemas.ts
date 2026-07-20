@@ -40,6 +40,17 @@ export const assignSiteSchema = z.object({
   trackingMethod: z.enum(["script", "gtm", "cms", "proxy"]).default("script"),
 });
 
+export const trackingDeploymentPlanSchema = z.object({
+  preferredProvider: z.enum(["auto", "cloudflare", "vercel", "wordpress", "manual"]).default("auto"),
+  vercelProject: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9][a-z0-9._-]*$/i, "Invalid Vercel project name")
+    .optional(),
+});
+
 const recipientSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(320),

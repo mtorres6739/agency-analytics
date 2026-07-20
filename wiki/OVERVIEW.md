@@ -40,6 +40,7 @@ Implemented on `codex/agency-analytics-v1` against upstream `3ac02f2d4983fb4865e
 - `infra/agency/` owns the Hetzner production overlay, hardened Caddy policy, immutable-SHA deploy/rollback script, and encrypted offsite backup script.
 - `infra/tracking-edge/` installs a same-origin tracker through site-scoped Cloudflare Workers for already-proxied WordPress or Vercel domains, with explicit manifests and plan/apply/verify/rollback gates.
 - `infra/tracking-vercel/` discovers a Vercel project's GitHub source and opens a single-file Next.js 15.3+ instrumentation PR for preview-first installation.
+- Client onboarding exposes the same provider contract through tenant-scoped BullMQ jobs and durable `tracking_deployments` records. Plans are read-only; applies, status refreshes, and rollback remain bound to the assigned site and store sanitized results only.
 - `.github/workflows/agency-images.yml` verifies and publishes commit-SHA images to GHCR.
 - Better Auth TOTP, encrypted backup codes, account lockout, and server-side privileged-role enforcement protect agency owners and administrators.
 - The Next.js proxy must keep `/two-factor` in its built-in single-segment route set; otherwise the generic site canonicalizer rewrites the authentication challenge to `/two-factor/main` and prevents privileged users from completing sign-in.

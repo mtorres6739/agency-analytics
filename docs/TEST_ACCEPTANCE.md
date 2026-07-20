@@ -11,6 +11,9 @@
 - Client summaries cannot include inaccessible sites.
 - Report scheduling validates timezone and cadence and remains idempotent.
 - Audit events contain no secrets or report-recipient content beyond required identifiers.
+- Tracking plan/apply/status/rollback rejects non-admin users, cross-client source IDs, and concurrent jobs for one site.
+- Cloudflare planning blocks inherited route conflicts; apply verifies live injection/proxy headers; rollback removes only the managed site route.
+- Vercel output contains only the public analytics origin and site ID and never overwrites existing instrumentation.
 
 ### Client
 
@@ -25,6 +28,7 @@
 - Public tracking writes pageviews and conversions without raw IP storage.
 - Two users assigned to different clients cannot cross-read via UI, direct URLs, API IDs, exports, or report links.
 - GSC and Resend use mocks in CI; live credentials are verified only in staging.
+- Cloudflare, Vercel, and GitHub use mocks in CI; live provider plans are read-only until an owner confirms apply.
 - Backup restoration reconstructs authentication, access, analytics, and reporting state.
 
 ## Performance

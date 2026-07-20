@@ -11,6 +11,13 @@ export {
 } from "./clients.js";
 export { createClientSchema, updateClientSchema, assignSiteSchema } from "./schemas.js";
 export {
+  applyTrackingDeployment,
+  listTrackingDeployments,
+  planTrackingDeployment,
+  refreshTrackingDeployment,
+  rollbackTrackingDeployment,
+} from "./trackingDeployments.js";
+export {
   createReportSchedule,
   deleteReportSchedule,
   getReportRunDownload,

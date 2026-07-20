@@ -1,4 +1,4 @@
-import type { AgencyClient, ClientSummary, OnboardingState } from "@rybbit/shared";
+import type { AgencyClient, ClientSummary, OnboardingState, TrackingDeployment } from "@rybbit/shared";
 import { authedFetch } from "../../utils";
 
 export type CreateAgencyClientInput = {
@@ -53,3 +53,59 @@ export function fetchAgencyClientOnboarding(organizationId: string, clientId: st
 export function fetchAgencyClientSummary(organizationId: string, clientId: string) {
   return authedFetch<{ summary: ClientSummary }>(`/organizations/${organizationId}/clients/${clientId}/summary`);
 }
+
+function trackingDeploymentPath(organizationId: string, clientId: string, siteId: number) {
+  return `/organizations/${organizationId}/clients/${clientId}/sites/${siteId}/tracking-deployments`;
+}
+
+export function fetchTrackingDeployments(organizationId: string, clientId: string, siteId: number) {
+  return authedFetch<{ deployments: TrackingDeployment[] }>(trackingDeploymentPath(organizationId, clientId, siteId));
+}
+
+export function planTrackingDeployment(
+  organizationId: string,
+  clientId: string,
+  siteId: number,
+  data: { preferredProvider: "auto" | "cloudflare" | "vercel" | "wordpress" | "manual"; vercelProject?: string }
+) {
+  return authedFetch<{ deployment: TrackingDeployment }>(
+    `${trackingDeploymentPath(organizationId, clientId, siteId)}/plan`,
+    undefined,
+    { method: "POST", data }
+  );
+}
+
+function runTrackingDeploymentAction(
+  organizationId: string,
+  clientId: string,
+  siteId: number,
+  deploymentId: string,
+  action: "apply" | "status" | "rollback"
+) {
+  return authedFetch<{ deployment: TrackingDeployment }>(
+    `${trackingDeploymentPath(organizationId, clientId, siteId)}/${deploymentId}/${action}`,
+    undefined,
+    { method: "POST" }
+  );
+}
+
+export const applyTrackingDeployment = (
+  organizationId: string,
+  clientId: string,
+  siteId: number,
+  deploymentId: string
+) => runTrackingDeploymentAction(organizationId, clientId, siteId, deploymentId, "apply");
+
+export const refreshTrackingDeployment = (
+  organizationId: string,
+  clientId: string,
+  siteId: number,
+  deploymentId: string
+) => runTrackingDeploymentAction(organizationId, clientId, siteId, deploymentId, "status");
+
+export const rollbackTrackingDeployment = (
+  organizationId: string,
+  clientId: string,
+  siteId: number,
+  deploymentId: string
+) => runTrackingDeploymentAction(organizationId, clientId, siteId, deploymentId, "rollback");

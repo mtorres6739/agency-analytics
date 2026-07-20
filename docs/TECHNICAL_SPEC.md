@@ -65,12 +65,13 @@ flowchart LR
 - `report_recipients`: schedule, name, email, locale, enabled state.
 - `report_runs`: period, status, summary JSON, artifact key, attempts, error summary, timestamps.
 - `agency_audit_events`: organization, optional client, actor, action, target, sanitized metadata, timestamp.
+- `tracking_deployments`: organization/client/site, provider, action, queue status, public input, sanitized result, actor, error summary, and lifecycle timestamps. Credentials are environment-only.
 
 Client creation and site assignment update the agency tables and Rybbit team access tables in one Postgres transaction.
 
 ## Shared contracts
 
-`AgencyClient`, `AgencyClientSite`, `ClientSummary`, `OnboardingState`, `ReportSchedule`, `ReportRecipient`, and `ReportRun` are exported from `@rybbit/shared`. Dates cross the HTTP boundary as ISO 8601 strings.
+`AgencyClient`, `AgencyClientSite`, `ClientSummary`, `OnboardingState`, `TrackingDeployment`, `ReportSchedule`, `ReportRecipient`, and `ReportRun` are exported from `@rybbit/shared`. Dates cross the HTTP boundary as ISO 8601 strings.
 
 ## HTTP interfaces
 
@@ -82,6 +83,9 @@ Client creation and site assignment update the agency tables and Rybbit team acc
 - CRUD under `/api/organizations/:organizationId/clients/:clientId/report-schedules`
 - `GET /api/organizations/:organizationId/clients/:clientId/report-runs`
 - `POST /api/organizations/:organizationId/clients/:clientId/report-runs/:runId/retry`
+- `GET /api/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments`
+- `POST /api/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments/plan`
+- `POST /api/organizations/:organizationId/clients/:clientId/sites/:siteId/tracking-deployments/:deploymentId/{apply|status|rollback}`
 
 Every handler validates Zod input, verifies organization membership, derives accessible sites on the server, and returns `{ error: string, details?: unknown }` for failures.
 
@@ -130,6 +134,6 @@ Tracking installation uses two provider adapters with the same contract: explici
 
 Cloudflare-proxied WordPress uses the edge adapter. A DNS-only WordPress site can install and activate the public `integrate-rybbit` plugin through WordPress's authenticated plugin REST API, but that plugin does not expose its site ID and self-hosted script URL through REST. Full zero-touch configuration therefore requires WP-CLI/SFTP access or a separately reviewed managed connector plugin. The system must not claim full automatic installation when only an Application Password is available.
 
-### Application integration target
+### Application integration
 
-The operator tools are the first production-safe slice. The client onboarding UI will invoke the same provider contract through queued server jobs after deployment credentials are moved to a dedicated secret manager. The browser will receive sanitized plan/status data only; provider tokens, repository credentials, and WordPress application passwords remain server-side.
+The client onboarding UI invokes the provider contract through BullMQ. Every job reloads canonical organization/client/site assignment before execution; follow-up apply, status, and rollback jobs are bound to the original completed run. The browser receives sanitized plan/status data only. Provider tokens, repository credentials, and WordPress application passwords remain server-side.

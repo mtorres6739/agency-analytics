@@ -13,6 +13,7 @@ import {
   sites,
   team,
   teamSiteAccess,
+  trackingDeployments,
   uptimeMonitorStatus,
   uptimeMonitors,
 } from "../../db/postgres/schema.js";
@@ -390,7 +391,7 @@ export async function getAgencyClientOnboarding(
   const client = serializeRows(clientRows)[0];
   if (!client) return reply.status(404).send({ error: "Client not found" });
   const siteIds = client.sites.map((site: any) => site.siteId);
-  const [goalRows, gscRows, uptimeRows, scheduleRows] = await Promise.all([
+  const [goalRows, gscRows, uptimeRows, scheduleRows, deploymentRows] = await Promise.all([
     siteIds.length ? db.select({ id: goals.goalId }).from(goals).where(inArray(goals.siteId, siteIds)).limit(1) : [],
     siteIds.length
       ? db
@@ -408,6 +409,20 @@ export async function getAgencyClientOnboarding(
       .from(reportSchedules)
       .where(and(eq(reportSchedules.clientId, clientId), eq(reportSchedules.enabled, true)))
       .limit(1),
+    siteIds.length
+      ? db
+          .select({ id: trackingDeployments.id })
+          .from(trackingDeployments)
+          .where(
+            and(
+              eq(trackingDeployments.clientId, clientId),
+              eq(trackingDeployments.action, "apply"),
+              eq(trackingDeployments.status, "succeeded"),
+              inArray(trackingDeployments.siteId, siteIds)
+            )
+          )
+          .limit(1)
+      : [],
   ]);
 
   const verified = client.sites.some((site: any) => site.trackingStatus === "verified");
@@ -425,7 +440,11 @@ export async function getAgencyClientOnboarding(
   const steps = [
     { key: "client", label: "Create client", complete: true },
     { key: "site", label: "Add a website", complete: siteIds.length > 0 },
-    { key: "installation", label: "Choose an installation method", complete: siteIds.length > 0 },
+    {
+      key: "installation",
+      label: "Install tracking",
+      complete: verified || deploymentRows.length > 0,
+    },
     { key: "privacy", label: "Configure privacy exclusions", complete: siteIds.length > 0 },
     { key: "verification", label: "Verify the first event", complete: verified },
     { key: "goals", label: "Configure conversion goals", complete: goalRows.length > 0 },

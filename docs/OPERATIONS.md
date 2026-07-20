@@ -60,6 +60,10 @@ Use `infra/agency/restore.sh <encrypted-archive>` only in a clean recovery envir
 
 ## Tracking installation operations
 
+The client onboarding screen now invokes the same provider contract through backend BullMQ jobs. **Detect and plan** is read-only. **Install tracking** applies a Cloudflare route only after a successful plan; **Create preview PR** creates or reuses a Vercel/GitHub branch and never merges it. Status and rollback actions remain bound to the original completed run. Set `TRACKING_INSTALLER_ENABLED=true` only after the least-privilege provider variables in `.env.production` are configured.
+
+Automatic detection checks an already-proxied Cloudflare hostname first, then searches Vercel projects/domains. DNS-only WordPress is detected but blocked until that site has either a supported Cloudflare path or WP-CLI/SFTP/managed-connector access. The application must continue to state this limitation explicitly.
+
 Use `infra/tracking-edge` for an already Cloudflare-proxied domain and `infra/tracking-vercel` for a DNS-only Next.js project on Vercel. Never enable the Cloudflare proxy solely to make tracker deployment easier; that is a separate networking change requiring application review.
 
 Cloudflare sequence:
@@ -79,4 +83,6 @@ Vercel sequence:
 4. Test the Vercel preview in a real browser and verify event ingestion before merging.
 5. Use `npm run rollback` only while the PR is unmerged. After merge, use a normal revert PR.
 
-The Cloudflare deployment token is stored in macOS Keychain service `agency-analytics-cloudflare-tracking-edge`. It is limited to Workers script deployment plus zone/DNS read and Worker route changes for the 49 active zones present on 2026-07-19. Expand or rotate it when zones change; never replace it with the Global API key. Vercel and GitHub credentials are loaded from their authenticated CLIs and are never printed or committed.
+The workstation Cloudflare deployment token is stored in macOS Keychain service `agency-analytics-cloudflare-tracking-edge`. It is limited to Workers script deployment plus zone/DNS read and Worker route changes for the 49 active zones present on 2026-07-19. Expand or rotate it when zones change; never replace it with the Global API key. Local operator scripts load Vercel and GitHub credentials from their authenticated CLIs; the production backend reads dedicated equivalents from its root-readable environment. Credentials are never printed or committed.
+
+For production onboarding, copy only the dedicated installer tokens into the root-readable server environment and pass them to the backend container. Do not reuse the Cloudflare Global API key. Rotate or remove the server-side tokens to immediately disable provider mutations; setting `TRACKING_INSTALLER_ENABLED=false` disables new plans and applies at the application layer.

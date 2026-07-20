@@ -16,6 +16,7 @@ import { useGetSitesFromOrg } from "../../../../api/admin/hooks/useSites";
 import { useUserOrganizations } from "../../../../api/admin/hooks/useOrganizations";
 import { AgencyHeader, StatusBadge } from "../../../../components/agency/AgencyHeader";
 import { AgencyEmpty, AgencyError, AgencyLoading } from "../../../../components/agency/AgencyStates";
+import { TrackingInstaller } from "../../../../components/agency/TrackingInstaller";
 import { authClient } from "../../../../lib/auth";
 
 export default function ClientOverviewPage() {
@@ -129,42 +130,48 @@ export default function ClientOverviewPage() {
             ) : (
               <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
                 {client.sites.map(site => (
-                  <div
-                    key={site.siteId}
-                    className="flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-10 place-items-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
-                        <Globe2 className="size-5" />
-                      </span>
-                      <div>
-                        <p className="font-medium">{site.name}</p>
-                        <p className="text-xs text-neutral-500">{site.domain}</p>
+                  <div key={site.siteId}>
+                    <div className="flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="grid size-10 place-items-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
+                          <Globe2 className="size-5" />
+                        </span>
+                        <div>
+                          <p className="font-medium">{site.name}</p>
+                          <p className="text-xs text-neutral-500">{site.domain}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={site.trackingStatus} />
+                        {site.trackingStatus !== "verified" && organization && canManage ? (
+                          <button
+                            type="button"
+                            disabled={verify.isPending}
+                            onClick={() =>
+                              verify.mutate({
+                                organizationId: organization.id,
+                                clientId: client.id,
+                                siteId: site.siteId,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 text-sm font-medium text-neutral-600 hover:text-neutral-950 disabled:opacity-50 dark:text-neutral-300 dark:hover:text-white"
+                          >
+                            <RefreshCw className={`size-4 ${verify.isPending ? "animate-spin" : ""}`} />
+                            {t("Verify")}
+                          </button>
+                        ) : null}
+                        <Link
+                          href={`/${site.siteId}/main`}
+                          className="inline-flex items-center gap-1 text-sm font-medium text-accent-700 hover:underline dark:text-accent-300"
+                        >
+                          {t("Open analytics")}
+                          <ArrowUpRight className="size-4" />
+                        </Link>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={site.trackingStatus} />
-                      {site.trackingStatus !== "verified" && organization && canManage ? (
-                        <button
-                          type="button"
-                          disabled={verify.isPending}
-                          onClick={() =>
-                            verify.mutate({ organizationId: organization.id, clientId: client.id, siteId: site.siteId })
-                          }
-                          className="inline-flex items-center gap-1 text-sm font-medium text-neutral-600 hover:text-neutral-950 disabled:opacity-50 dark:text-neutral-300 dark:hover:text-white"
-                        >
-                          <RefreshCw className={`size-4 ${verify.isPending ? "animate-spin" : ""}`} />
-                          {t("Verify")}
-                        </button>
-                      ) : null}
-                      <Link
-                        href={`/${site.siteId}/main`}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-accent-700 hover:underline dark:text-accent-300"
-                      >
-                        {t("Open analytics")}
-                        <ArrowUpRight className="size-4" />
-                      </Link>
-                    </div>
+                    {organization && canManage ? (
+                      <TrackingInstaller organizationId={organization.id} clientId={client.id} site={site} />
+                    ) : null}
                   </div>
                 ))}
               </div>

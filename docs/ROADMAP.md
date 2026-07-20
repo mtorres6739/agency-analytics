@@ -8,7 +8,7 @@
 - M3 client summary metrics are live in code; acquisition/content/GSC/Web Vitals portfolio aggregation and performance validation remain.
 - M4 reporting control plane is complete; workers, artifacts, signed downloads, and Resend delivery remain.
 - M5 requires provisioned Hetzner environments and pilot clients.
-- Managed tracking operator tooling is implemented for Cloudflare-proxied origins and Next.js 15.3+ Vercel/GitHub projects. The first exact site mapping, browser preview, and ingestion pilot remain gated.
+- Managed tracking is available from client onboarding through tenant-scoped queued plan/apply/status/rollback APIs. Cloudflare-proxied origins can install and verify directly; Next.js 15.3+ Vercel/GitHub projects receive a preview PR. DNS-only WordPress remains gated on WP-CLI/SFTP or a managed connector.
 
 ## M0: Foundation
 
@@ -33,7 +33,7 @@ Exit: first load and client navigation initialize Preline once with no console e
 - Add agency schema and migration.
 - Add client CRUD, site assignment, access checks, and audit events.
 - Build portfolio, clients, client overview, and onboarding.
-- Move the proven tracking provider contract behind queued agency APIs and expose plan/apply/status/rollback from the onboarding wizard without returning provider credentials to the browser.
+- [x] Move the proven tracking provider contract behind queued agency APIs and expose plan/apply/status/rollback from onboarding without returning provider credentials to the browser.
 
 Exit: automated two-client isolation tests pass.
 

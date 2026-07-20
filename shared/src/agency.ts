@@ -7,6 +7,59 @@ export type TrackingMethod = (typeof trackingMethods)[number];
 export const trackingStatuses = ["pending", "verified", "stale", "error"] as const;
 export type TrackingStatus = (typeof trackingStatuses)[number];
 
+export const trackingDeploymentProviders = ["cloudflare", "vercel", "wordpress", "manual"] as const;
+export type TrackingDeploymentProvider = (typeof trackingDeploymentProviders)[number];
+
+export const trackingDeploymentActions = ["plan", "apply", "status", "rollback"] as const;
+export type TrackingDeploymentAction = (typeof trackingDeploymentActions)[number];
+
+export const trackingDeploymentStatuses = ["queued", "running", "succeeded", "failed", "blocked"] as const;
+export type TrackingDeploymentStatus = (typeof trackingDeploymentStatuses)[number];
+
+export interface TrackingDeployment {
+  id: string;
+  organizationId: string;
+  clientId: string;
+  siteId: number;
+  provider: TrackingDeploymentProvider;
+  action: TrackingDeploymentAction;
+  status: TrackingDeploymentStatus;
+  input: {
+    preferredProvider?: "auto" | TrackingDeploymentProvider;
+    vercelProject?: string;
+    sourceDeploymentId?: string;
+  };
+  result: {
+    hostname?: string;
+    provider?: TrackingDeploymentProvider;
+    supported?: boolean;
+    installed?: boolean;
+    blocked?: boolean;
+    reason?: string;
+    project?: string;
+    repository?: string;
+    filePath?: string;
+    branch?: string;
+    pullRequestUrl?: string;
+    previewUrl?: string;
+    previewState?: string;
+    route?: string;
+    workerScript?: string;
+    verification?: {
+      homepageStatus: number;
+      scriptStatus: number;
+      injected: boolean;
+      proxied: boolean;
+    };
+  };
+  errorSummary: string | null;
+  actorUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 export interface AgencyClientSite {
   clientId: string;
   siteId: number;
