@@ -1,6 +1,9 @@
 services:
   caddy:
     profiles: !reset []
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - LEGACY_DOMAIN_NAME=${LEGACY_DOMAIN_NAME}
     volumes: !override
       - ./infra/agency/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
