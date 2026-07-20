@@ -152,7 +152,21 @@ export function TrackingInstaller({
                     : site.domain}
               </p>
             </div>
-            {latestPlan.status === "succeeded" && !latestPlan.result.blocked ? (
+            {latestPlan.status === "succeeded" && !latestPlan.result.blocked && latestPlan.result.installed ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                  <CheckCircle2 className="size-3.5" aria-hidden="true" /> Already installed
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => verify.mutate({ organizationId, clientId, siteId: site.siteId })}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                >
+                  <CheckCircle2 className="size-4" /> Verify event
+                </button>
+              </div>
+            ) : latestPlan.status === "succeeded" && !latestPlan.result.blocked ? (
               <button
                 type="button"
                 disabled={busy}
