@@ -60,11 +60,11 @@ Use `infra/agency/restore.sh <encrypted-archive>` only in a clean recovery envir
 
 ## Tracking installation operations
 
-The client onboarding screen invokes the provider contract through backend BullMQ jobs. **Detect and plan** remains available as a read-only operator action. In production, `TRACKING_AUTO_DEPLOY_ENABLED=true` makes ordinary web-site creation provision its client/team boundary and enqueue a plan with automatic apply. Cloudflare installs and verifies the site-scoped Worker. Vercel creates a GitHub pull request, waits for a successful preview, and squash-merges it; older Next.js App Router projects receive an idempotent root-layout integration when `instrumentation-client` is unavailable. The empty site dashboard shows this durable deployment state instead of manual snippet instructions. Set both tracking flags only after the least-privilege provider variables in `.env.production` are configured.
+The client onboarding screen invokes the provider contract through backend BullMQ jobs. **Detect and plan** remains available as a read-only operator action. In production, `TRACKING_AUTO_DEPLOY_ENABLED=true` makes ordinary web-site creation provision its client/team boundary and enqueue a plan with automatic apply. Cloudflare installs and verifies the site-scoped Worker. Vercel creates a GitHub pull request, waits for a successful preview, and squash-merges it; older Next.js App Router projects receive an idempotent root-layout integration when `instrumentation-client` is unavailable, and Vite projects receive an idempotent managed script in the root `index.html`. The empty site dashboard shows this durable deployment state instead of manual snippet instructions. Set both tracking flags only after the least-privilege provider variables in `.env.production` are configured.
 
 Automatic detection checks an already-proxied Cloudflare hostname first, then searches Vercel projects/domains. DNS-only WordPress is detected but blocked until that site has either a supported Cloudflare path or WP-CLI/SFTP/managed-connector access. The application must continue to state this limitation explicitly.
 
-Use `infra/tracking-edge` for an already Cloudflare-proxied domain and `infra/tracking-vercel` for a DNS-only Next.js project on Vercel. Never enable the Cloudflare proxy solely to make tracker deployment easier; that is a separate networking change requiring application review.
+Use `infra/tracking-edge` for an already Cloudflare-proxied domain and `infra/tracking-vercel` for a DNS-only Next.js or Vite project on Vercel. Never enable the Cloudflare proxy solely to make tracker deployment easier; that is a separate networking change requiring application review.
 
 Cloudflare sequence:
 

@@ -26,7 +26,7 @@ As of 2026-07-19, `npm audit --omit=dev` reports zero production advisories for 
 - Logs redact authorization headers, cookies, OAuth tokens, recipient addresses, and signed URLs.
 - Rotate credentials after suspected disclosure and at least annually.
 - Tracking deployment uses a separate Cloudflare token limited to Workers Scripts Write, Zone Read, DNS Read, and Workers Routes Write on explicit account zones. The Global API key is bootstrap-only and must not be used by the installer.
-- Vercel/GitHub installation opens a preview PR and does not merge production. Generated source contains only a public analytics origin and numeric site ID.
+- Vercel/GitHub installation opens a preview PR. Operator-triggered installation does not merge production; the explicitly enabled site-creation auto-deploy path waits for a ready preview before squash-merging. Generated source contains only a public analytics origin and public tracking property ID.
 - Managed installation credentials are read only from the backend environment. Deployment records persist public inputs, sanitized results, actor IDs, and status; they never persist tokens or WordPress passwords. Use an expiring Vercel token and a repository-limited GitHub token where the providers permit it.
 - WordPress Application Passwords are sent only to the exact HTTPS site origin and are never stored in the client application or analytics database.
 

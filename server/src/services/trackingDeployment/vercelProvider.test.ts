@@ -3,6 +3,7 @@ import {
   buildAppLayoutInstrumentation,
   buildInstrumentation,
   buildNextConfigCspAllowance,
+  buildStaticHtmlInstrumentation,
   hasManagedInstrumentation,
   supportsClientInstrumentation,
 } from "./vercelProvider.js";
@@ -53,5 +54,22 @@ describe("Vercel tracking source", () => {
     expect(source).toContain(`script-src 'self' 'unsafe-inline' https://analytics.example.com`);
     expect(source).toContain(`connect-src 'self' https://analytics.example.com`);
     expect(buildNextConfigCspAllowance(source, "https://analytics.example.com")).toBe(source);
+  });
+
+  it("injects an idempotent tracker into a Vite HTML entrypoint", () => {
+    const html = `<!doctype html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n  </head>\n  <body></body>\n</html>\n`;
+    const source = buildStaticHtmlInstrumentation(html, "https://analytics.example.com", "public-42");
+
+    expect(source).toContain('src="https://analytics.example.com/api/script.js"');
+    expect(source).toContain('data-site-id="public-42"');
+    expect(source).toContain('data-agency-analytics="managed"');
+    expect(buildStaticHtmlInstrumentation(source, "https://analytics.example.com", "public-42")).toBe(source);
+  });
+
+  it("refuses to replace a different managed tracker in a Vite HTML entrypoint", () => {
+    const html = `<html><head><script data-agency-analytics="managed" data-site-id="other"></script></head></html>`;
+    expect(() => buildStaticHtmlInstrumentation(html, "https://analytics.example.com", "public-42")).toThrow(
+      "different managed analytics tracker"
+    );
   });
 });

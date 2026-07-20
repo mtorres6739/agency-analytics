@@ -31,7 +31,7 @@ type Inspection = {
   desired: string;
   baseContent: string | null;
   existingSha?: string;
-  deploymentMode: "instrumentation-client" | "app-layout";
+  deploymentMode: "instrumentation-client" | "app-layout" | "static-html";
   additionalFiles: ManagedFile[];
 };
 
@@ -126,8 +126,7 @@ class VercelClient extends ApiClient {
     return (
       payload.deployments?.find(
         (deployment: any) =>
-          deployment.meta?.githubCommitRef === branch &&
-          (!commitSha || deployment.meta?.githubCommitSha === commitSha)
+          deployment.meta?.githubCommitRef === branch && (!commitSha || deployment.meta?.githubCommitSha === commitSha)
       ) ?? null
     );
   }
@@ -267,6 +266,20 @@ export function buildAppLayoutInstrumentation(source: string, analyticsOrigin: s
   return `${withImport.slice(0, insertionPoint)}${tracker}${withImport.slice(insertionPoint)}`;
 }
 
+export function buildStaticHtmlInstrumentation(source: string, analyticsOrigin: string, trackingId: string) {
+  if (hasManagedInstrumentation(source, analyticsOrigin, trackingId)) return source;
+  if (hasManagedMarker(source)) {
+    throw new Error("The HTML entrypoint already contains a different managed analytics tracker");
+  }
+  const closingHead = source.match(/<\/head\s*>/i);
+  if (!closingHead?.index && closingHead?.index !== 0) {
+    throw new Error("The HTML entrypoint does not contain a closing head element");
+  }
+  const indentation = source.slice(0, closingHead.index).match(/(?:^|\n)([ \t]*)[^\n]*$/)?.[1] ?? "  ";
+  const tracker = `${indentation}<script\n${indentation}  src="${analyticsOrigin}/api/script.js"\n${indentation}  data-site-id="${trackingId}"\n${indentation}  data-agency-analytics="managed"\n${indentation}  defer\n${indentation}></script>\n`;
+  return `${source.slice(0, closingHead.index)}${tracker}${source.slice(closingHead.index)}`;
+}
+
 function directiveContainsOrigin(source: string, directive: string, analyticsOrigin: string) {
   return source.split(/\r?\n/).some(line => line.includes(directive) && line.includes(analyticsOrigin));
 }
@@ -345,7 +358,9 @@ export class VercelTrackingProvider {
       ? await this.vercel.getProject(projectName)
       : await this.vercel.findProjectByDomain(site.hostname);
     if (!project) throw new Error(`No Vercel project contains ${site.hostname}`);
-    if (project.framework !== "nextjs") throw new Error(`${project.name} is not a Next.js project`);
+    if (!project.framework || !["nextjs", "vite"].includes(project.framework)) {
+      throw new Error(`${project.name} does not use a supported Next.js or Vite framework`);
+    }
     if (project.link?.type !== "github" || !project.link.org || !project.link.repo) {
       throw new Error(`${project.name} is not connected to a GitHub repository`);
     }
@@ -357,47 +372,57 @@ export class VercelTrackingProvider {
     const packageItem = await this.github.getContent(owner, repo, joinPath(root, "package.json"), base);
     if (!packageItem?.content) throw new Error(`package.json was not found for ${project.name}`);
     const packageJson = JSON.parse(decodeContent(packageItem));
-    const nextVersion = packageJson.dependencies?.next ?? packageJson.devDependencies?.next;
-
-    const srcApp = await this.github.getContent(owner, repo, joinPath(root, "src", "app"), base);
-    const srcPages = srcApp ? null : await this.github.getContent(owner, repo, joinPath(root, "src", "pages"), base);
-    const sourceRoot = srcApp || srcPages ? "src" : "";
-    const tsconfig = await this.github.getContent(owner, repo, joinPath(root, "tsconfig.json"), base);
-    const useClientInstrumentation = supportsClientInstrumentation(nextVersion);
     let filePath: string;
     let existing: any;
     let existingContent: string | null;
     let desired: string;
     let deploymentMode: Inspection["deploymentMode"];
 
-    if (useClientInstrumentation) {
-      filePath = joinPath(root, sourceRoot, `instrumentation-client.${tsconfig ? "ts" : "js"}`);
+    if (project.framework === "vite") {
+      filePath = joinPath(root, "index.html");
       existing = await this.github.getContent(owner, repo, filePath, base);
-      existingContent = existing?.content ? decodeContent(existing) : null;
-      desired = buildInstrumentation(this.config.analyticsOrigin, site.trackingId);
-      deploymentMode = "instrumentation-client";
+      if (!existing?.content) throw new Error(`${project.name} does not have a supported index.html entrypoint`);
+      existingContent = decodeContent(existing);
+      desired = buildStaticHtmlInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId);
+      deploymentMode = "static-html";
     } else {
-      if (!srcApp) {
-        throw new Error(
-          `${project.name} uses Next.js ${nextVersion ?? "unknown"}; automatic installation below 15.3 requires the App Router`
-        );
-      }
-      const candidates = ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"];
-      let layout: any;
-      filePath = "";
-      for (const candidate of candidates) {
-        const candidatePath = joinPath(root, sourceRoot, "app", candidate);
-        layout = await this.github.getContent(owner, repo, candidatePath, base);
-        if (layout?.content) {
-          filePath = candidatePath;
-          break;
+      const nextVersion = packageJson.dependencies?.next ?? packageJson.devDependencies?.next;
+      const srcApp = await this.github.getContent(owner, repo, joinPath(root, "src", "app"), base);
+      const srcPages = srcApp ? null : await this.github.getContent(owner, repo, joinPath(root, "src", "pages"), base);
+      const sourceRoot = srcApp || srcPages ? "src" : "";
+      const tsconfig = await this.github.getContent(owner, repo, joinPath(root, "tsconfig.json"), base);
+      const useClientInstrumentation = supportsClientInstrumentation(nextVersion);
+
+      if (useClientInstrumentation) {
+        filePath = joinPath(root, sourceRoot, `instrumentation-client.${tsconfig ? "ts" : "js"}`);
+        existing = await this.github.getContent(owner, repo, filePath, base);
+        existingContent = existing?.content ? decodeContent(existing) : null;
+        desired = buildInstrumentation(this.config.analyticsOrigin, site.trackingId);
+        deploymentMode = "instrumentation-client";
+      } else {
+        if (!srcApp) {
+          throw new Error(
+            `${project.name} uses Next.js ${nextVersion ?? "unknown"}; automatic installation below 15.3 requires the App Router`
+          );
         }
+        const candidates = ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"];
+        let layout: any;
+        filePath = "";
+        for (const candidate of candidates) {
+          const candidatePath = joinPath(root, sourceRoot, "app", candidate);
+          layout = await this.github.getContent(owner, repo, candidatePath, base);
+          if (layout?.content) {
+            filePath = candidatePath;
+            break;
+          }
+        }
+        if (!layout?.content || !filePath)
+          throw new Error(`${project.name} does not have a supported App Router layout`);
+        existing = layout;
+        existingContent = decodeContent(layout);
+        desired = buildAppLayoutInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId);
+        deploymentMode = "app-layout";
       }
-      if (!layout?.content || !filePath) throw new Error(`${project.name} does not have a supported App Router layout`);
-      existing = layout;
-      existingContent = decodeContent(layout);
-      desired = buildAppLayoutInstrumentation(existingContent, this.config.analyticsOrigin, site.trackingId);
-      deploymentMode = "app-layout";
     }
     const homepage = await this.fetchImpl(`https://${site.hostname}/`, { method: "HEAD", redirect: "follow" }).catch(
       () => null
@@ -405,7 +430,7 @@ export class VercelTrackingProvider {
     const policy = homepage?.headers.get("content-security-policy") ?? null;
     let cspCompatible = trackerCspCompatible(policy, this.config.analyticsOrigin);
     const additionalFiles: ManagedFile[] = [];
-    if (!cspCompatible) {
+    if (!cspCompatible && project.framework === "nextjs") {
       for (const candidate of ["next.config.ts", "next.config.mjs", "next.config.js"]) {
         const configPath = joinPath(root, candidate);
         const configFile = await this.github.getContent(owner, repo, configPath, base);

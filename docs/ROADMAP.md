@@ -8,7 +8,7 @@
 - M3 client summary metrics are live in code; acquisition/content/GSC/Web Vitals portfolio aggregation and performance validation remain.
 - M4 reporting control plane is complete; workers, artifacts, signed downloads, and Resend delivery remain.
 - M5 requires provisioned Hetzner environments and pilot clients.
-- Managed tracking is available from client onboarding through tenant-scoped queued plan/apply/status/rollback APIs. Cloudflare-proxied origins can install and verify directly; Next.js 15.3+ Vercel/GitHub projects receive a preview PR. DNS-only WordPress remains gated on WP-CLI/SFTP or a managed connector.
+- Managed tracking is available from client onboarding through tenant-scoped queued plan/apply/status/rollback APIs. Cloudflare-proxied origins can install and verify directly; supported Next.js and Vite Vercel/GitHub projects receive a preview PR. DNS-only WordPress remains gated on WP-CLI/SFTP or a managed connector.
 
 ## M0: Foundation
 
