@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getCanonicalSitePath } from "./lib/proxyRoutes";
 
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
@@ -20,40 +21,10 @@ export async function proxy(request: NextRequest) {
 
   // Check if we're on a site route without a specific page
   // This matches exactly /{siteId} with nothing after it
-  const siteRoutePattern = /^\/([^/]+)$/;
-  const match = path.match(siteRoutePattern);
-
-  if (match) {
-    const siteId = match[1];
-
-    // Don't redirect certain built-in routes like 'login', 'signup', etc.
-    const excludedRoutes = [
-      "login",
-      "signup",
-      "subscribe",
-      "invitation",
-      "reset-password",
-      "auth",
-      "admin",
-      "organization",
-      "account",
-      "uptime",
-      "settings",
-      "rollup",
-      "portfolio",
-      "clients",
-      "reports",
-      "as",
-      "_next",
-      "api",
-      "widget",
-    ];
-    if (excludedRoutes.includes(siteId)) {
-      return NextResponse.next();
-    }
-
+  const canonicalSitePath = getCanonicalSitePath(path);
+  if (canonicalSitePath) {
     // Add cache control headers to make sure the redirect isn't cached
-    url.pathname = `/${siteId}/main`;
+    url.pathname = canonicalSitePath;
     const response = NextResponse.redirect(url);
     response.headers.set("Cache-Control", "no-store, max-age=0");
     return response;

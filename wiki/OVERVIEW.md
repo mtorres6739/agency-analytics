@@ -42,6 +42,7 @@ Implemented on `codex/agency-analytics-v1` against upstream `3ac02f2d4983fb4865e
 - `infra/tracking-vercel/` discovers a Vercel project's GitHub source and opens a single-file Next.js 15.3+ instrumentation PR for preview-first installation.
 - `.github/workflows/agency-images.yml` verifies and publishes commit-SHA images to GHCR.
 - Better Auth TOTP, encrypted backup codes, account lockout, and server-side privileged-role enforcement protect agency owners and administrators.
+- The Next.js proxy must keep `/two-factor` in its built-in single-segment route set; otherwise the generic site canonicalizer rewrites the authentication challenge to `/two-factor/main` and prevents privileged users from completing sign-in.
 - `server/src/services/agencyReports/` dispatches due schedules through BullMQ, renders private PDFs, stores encrypted S3 artifacts, creates seven-day signed downloads, sends aggregate Resend summaries, and recovers queued jobs after restart.
 
 Verified locally and in CI: shared build, server build, 25 focused tests including cross-client direct-URL isolation, privileged TOTP enforcement, deletion privacy, and ingestion throttling, client typecheck, client production build, production dependency audits, shell syntax, and Compose model validation.
