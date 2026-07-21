@@ -6,7 +6,8 @@ type VercelProject = {
 };
 
 type VercelDeployment = {
-  id: string;
+  id?: string;
+  uid?: string;
   url?: string;
   readyState?: string;
   status?: string;
@@ -116,6 +117,10 @@ export class VercelIdentityProvisioner {
     if (!priorDeployment) {
       throw new VercelIdentityError(`No ready production deployment exists for ${input.hostname}`, 409);
     }
+    const priorDeploymentId = priorDeployment.id ?? priorDeployment.uid;
+    if (!priorDeploymentId) {
+      throw new VercelIdentityError(`Vercel did not return a production deployment ID for ${input.hostname}`, 502);
+    }
 
     await this.upsertEnvironment(project.id, "RYBBIT_IDENTITY_SECRET", input.secret);
     await this.upsertEnvironment(project.id, "RYBBIT_SITE_ID", input.sitePublicId);
@@ -125,12 +130,13 @@ export class VercelIdentityProvisioner {
       body: JSON.stringify({
         name: project.name,
         project: project.id,
-        deploymentId: priorDeployment.id,
+        deploymentId: priorDeploymentId,
         target: "production",
       }),
     })) as VercelDeployment;
-    if (!deployment.id) throw new VercelIdentityError("Vercel did not return a deployment ID");
-    return { projectId: project.id, projectName: project.name, deploymentId: deployment.id };
+    const deploymentId = deployment.id ?? deployment.uid;
+    if (!deploymentId) throw new VercelIdentityError("Vercel did not return a deployment ID");
+    return { projectId: project.id, projectName: project.name, deploymentId };
   }
 
   async status(deploymentId: string): Promise<IdentityDeploymentState> {
