@@ -5,6 +5,7 @@ import { db } from "../../../db/postgres/postgres.js";
 import { userAliases, userProfiles } from "../../../db/postgres/schema.js";
 import { r2Storage } from "../../../services/storage/r2StorageService.js";
 import { processResults } from "../utils/utils.js";
+import { auditSiteIdentityEvent } from "../../../services/identity/identityAuditService.js";
 
 export interface DeleteUserRequest {
   Params: {
@@ -79,6 +80,13 @@ export async function deleteUser(req: FastifyRequest<DeleteUserRequest>, res: Fa
           and(eq(userAliases.siteId, siteId), or(eq(userAliases.userId, userId), eq(userAliases.anonymousId, userId)))
         ),
     ]);
+
+    await auditSiteIdentityEvent({
+      siteId,
+      actorUserId: req.user?.id ?? null,
+      action: "identified_user.deleted",
+      targetId: userId,
+    });
 
     return res.send({ success: true });
   } catch (error) {

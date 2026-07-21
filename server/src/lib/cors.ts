@@ -92,6 +92,7 @@ export function isPublicCorsPath(path: string): boolean {
   return (
     path === "/api/track" ||
     path === "/api/identify" ||
+    path === "/api/identify/verified" ||
     path === "/api/version" ||
     // OAuth/OIDC discovery documents (RFC 8414/9728) are public metadata that
     // browser-based MCP clients fetch cross-origin.

@@ -128,9 +128,9 @@ export function getUserDisplayName<
   const traitsEmail = data?.traits?.email as string | undefined;
   const isIdentified = !!data?.identified_user_id;
   return (
-    traitsUsername ||
     traitsName ||
     traitsEmail ||
+    traitsUsername ||
     (isIdentified ? (data?.identified_user_id as string) : generateName(data?.user_id as string))
   );
 }

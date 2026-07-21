@@ -113,6 +113,13 @@
       "when": 1784555463800,
       "tag": "0015_perfect_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1784643307712,
+      "tag": "0016_verified_identity",
+      "breakpoints": true
     }
   ]
 }

@@ -9,8 +9,17 @@ export {
   fetchSiteHasData,
   fetchSiteIsPublic,
   fetchSiteUsage,
+  fetchIdentitySettings,
+  updateIdentitySettings,
+  rotateIdentityKey,
 } from "./sites";
-export type { SiteResponse, GetSitesFromOrgResponse, SiteUsageResponse } from "./sites";
+export type {
+  SiteResponse,
+  GetSitesFromOrgResponse,
+  SiteUsageResponse,
+  IdentitySettings,
+  IdentityTraitKey,
+} from "./sites";
 
 // Organizations endpoints
 export {
@@ -44,11 +53,7 @@ export type {
 
 // Excluded IPs endpoints
 export { fetchExcludedIPs, updateExcludedIPs } from "./excludedIPs";
-export type {
-  ExcludedIPsResponse,
-  UpdateExcludedIPsRequest,
-  UpdateExcludedIPsResponse,
-} from "./excludedIPs";
+export type { ExcludedIPsResponse, UpdateExcludedIPsRequest, UpdateExcludedIPsResponse } from "./excludedIPs";
 
 // Excluded Countries endpoints
 export { fetchExcludedCountries, updateExcludedCountries } from "./excludedCountries";
@@ -78,21 +83,11 @@ export type {
 
 // Account Settings endpoints
 export { updateAccountSettings } from "./accountSettings";
-export type {
-  UpdateAccountSettingsRequest,
-  UpdateAccountSettingsResponse,
-} from "./accountSettings";
+export type { UpdateAccountSettingsRequest, UpdateAccountSettingsResponse } from "./accountSettings";
 
 // Private Link endpoints
-export {
-  getPrivateLinkConfig,
-  generatePrivateLinkKey,
-  revokePrivateLinkKey,
-} from "./privateLink";
-export type {
-  PrivateLinkConfigResponse,
-  UpdatePrivateLinkConfigResponse,
-} from "./privateLink";
+export { getPrivateLinkConfig, generatePrivateLinkKey, revokePrivateLinkKey } from "./privateLink";
+export type { PrivateLinkConfigResponse, UpdatePrivateLinkConfigResponse } from "./privateLink";
 
 // Import endpoints
 export { getSiteImports, createSiteImport, deleteSiteImport } from "./import";
@@ -103,20 +98,8 @@ export { getOrganizationMembers } from "./auth";
 export type { GetOrganizationMembersResponse } from "./auth";
 
 // Teams endpoints
-export {
-  fetchTeams,
-  createTeam,
-  updateTeam,
-  deleteTeam,
-} from "./teams";
-export type {
-  Team,
-  TeamMember,
-  TeamSite,
-  ListTeamsResponse,
-  CreateTeamInput,
-  UpdateTeamInput,
-} from "./teams";
+export { fetchTeams, createTeam, updateTeam, deleteTeam } from "./teams";
+export type { Team, TeamMember, TeamSite, ListTeamsResponse, CreateTeamInput, UpdateTeamInput } from "./teams";
 
 // ClickHouse Stats endpoints
 export { getClickhouseStats, getClickhouseQueryLog } from "./clickhouseStats";

@@ -925,15 +925,48 @@
         console.error("User ID must be a non-empty string");
         return;
       }
-      this.customUserId = userId.trim();
-      try {
-        localStorage.setItem(`${this.config.namespace}-user-id`, this.customUserId);
-      } catch (e2) {
-        console.warn("Could not persist user ID to localStorage");
+      const candidateUserId = userId.trim();
+      void this.sendIdentifyEvent(candidateUserId, traits, true).then(async (accepted) => {
+        if (!accepted) return;
+        this.customUserId = candidateUserId;
+        try {
+          localStorage.setItem(`${this.config.namespace}-user-id`, candidateUserId);
+        } catch (e2) {
+          console.warn("Could not persist user ID to localStorage");
+        }
+        this.sessionReplayRecorder?.updateUserId(candidateUserId);
+        await this.refreshFeatureFlags();
+      });
+    }
+    async identifyVerified(assertion) {
+      if (typeof assertion !== "string" || assertion.trim() === "") {
+        console.error("Identity assertion must be a non-empty string");
+        return false;
       }
-      void this.sendIdentifyEvent(this.customUserId, traits, true).then(() => this.refreshFeatureFlags());
-      if (this.sessionReplayRecorder) {
-        this.sessionReplayRecorder.updateUserId(this.customUserId);
+      try {
+        const response = await fetch(`${this.config.analyticsHost}/identify/verified`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ site_id: this.config.siteId, assertion: assertion.trim() }),
+          mode: "cors",
+          credentials: "omit",
+          keepalive: true
+        });
+        if (!response.ok) return false;
+        const result = await response.json();
+        if (!result.success || typeof result.user_id !== "string" || !result.user_id) return false;
+        this.customUserId = result.user_id;
+        try {
+          localStorage.setItem(`${this.config.namespace}-user-id`, result.user_id);
+        } catch {
+          console.warn("Could not persist verified user ID to localStorage");
+        }
+        this.sessionReplayRecorder?.updateUserId(result.user_id);
+        await this.refreshFeatureFlags();
+        return true;
+      } catch (error) {
+        console.error("Failed to verify user identity:", error);
+        return false;
       }
     }
     setTraits(traits) {
@@ -946,11 +979,13 @@
         console.warn("Cannot set traits without identifying user first. Call identify() first.");
         return;
       }
-      void this.sendIdentifyEvent(userId, traits, false).then(() => this.refreshFeatureFlags());
+      void this.sendIdentifyEvent(userId, traits, false).then((accepted) => {
+        if (accepted) return this.refreshFeatureFlags();
+      });
     }
     async sendIdentifyEvent(userId, traits, isNewIdentify = true) {
       try {
-        await fetch(`${this.config.analyticsHost}/identify`, {
+        const response = await fetch(`${this.config.analyticsHost}/identify`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -964,8 +999,10 @@
           mode: "cors",
           keepalive: true
         });
+        return response.ok;
       } catch (error) {
         console.error("Failed to send identify event:", error);
+        return false;
       }
     }
     clearUserId() {
@@ -1510,6 +1547,7 @@
         },
         identify: () => {
         },
+        identifyVerified: async () => false,
         setTraits: () => {
         },
         clearUserId: () => {
@@ -1539,6 +1577,10 @@
       error: queueMethod("error"),
       trackOutbound: queueMethod("trackOutbound"),
       identify: queueMethod("identify"),
+      identifyVerified: async (assertion) => {
+        earlyQueue.push(["identifyVerified", [assertion]]);
+        return false;
+      },
       setTraits: queueMethod("setTraits"),
       clearUserId: queueMethod("clearUserId"),
       getUserId: () => null,
@@ -1650,6 +1692,7 @@
       error: (error, properties = {}) => tracker.trackError(error, properties),
       trackOutbound: (url, text = "", target = "_self") => tracker.trackOutbound(url, text, target),
       identify: (userId, traits) => tracker.identify(userId, traits),
+      identifyVerified: (assertion) => tracker.identifyVerified(assertion),
       setTraits: (traits) => tracker.setTraits(traits),
       clearUserId: () => tracker.clearUserId(),
       getUserId: () => tracker.getUserId(),

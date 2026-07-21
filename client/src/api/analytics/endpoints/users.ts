@@ -8,6 +8,8 @@ export type UsersResponse = {
   user_id: string; // Device fingerprint
   identified_user_id: string; // Custom user ID when identified, empty string otherwise
   traits: Record<string, unknown> | null;
+  identity_source: string | null;
+  last_identified_at: string | null;
   country: string;
   region: string;
   city: string;
@@ -97,6 +99,8 @@ export type UserInfo = {
   last_channel: string;
   timezone: string;
   traits: Record<string, unknown> | null;
+  identity_source: string | null;
+  last_identified_at: string | null;
   linked_devices: LinkedDevice[];
   vitals: UserVitals | null;
   locations: UserLocationBreakdown[];

@@ -11,6 +11,8 @@ export type GetUsersResponse = {
   user_id: string; // Device fingerprint
   identified_user_id: string; // Custom user ID when identified, empty string otherwise
   traits: Record<string, unknown> | null;
+  identity_source: string | null;
+  last_identified_at: string | null;
   country: string;
   region: string;
   city: string;
@@ -76,7 +78,7 @@ export async function getUsers(req: FastifyRequest<GetUsersRequest>, res: Fastif
       LIMIT ${MAX_MATCHING_USER_IDS}
     `);
 
-    matchingUserIds = searchResult.map((r) => r.user_id);
+    matchingUserIds = searchResult.map(r => r.user_id);
     if (matchingUserIds.length === 0) {
       return res.send({
         data: [],

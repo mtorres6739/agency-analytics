@@ -14,6 +14,10 @@
 - Tracking plan/apply/status/rollback rejects non-admin users, cross-client source IDs, and concurrent jobs for one site.
 - Cloudflare planning blocks inherited route conflicts; apply verifies live injection/proxy headers; rollback removes only the managed site route.
 - Vercel output contains only the public analytics origin and site ID and never overwrites existing instrumentation.
+- Assertion tests cover signing, opaque ID stability, expiration, tampering, wrong-site use, trait normalization, allowlisting, 2 KB limits, replay rejection, Redis failure, and key rotation grace.
+- Direct unsigned identification remains disabled by default and cannot persist a browser ID after server rejection.
+- Public/private-link access to user lists, searches, traits, and user detail is rejected.
+- Medical/legal compliance-blocked sites cannot create or enable identity keys.
 
 ### Client
 
@@ -30,6 +34,8 @@
 - GSC and Resend use mocks in CI; live credentials are verified only in staging.
 - Cloudflare, Vercel, and GitHub use mocks in CI; live provider plans are read-only until an owner confirms apply.
 - Backup restoration reconstructs authentication, access, analytics, and reporting state.
+- A delivered GHL fixture returns an assertion and links the preceding anonymous session; failed delivery, honeypot, and webhook fallback return no assertion.
+- Assert that phone, message, service, address, health/legal details, and provider response bodies are absent from Postgres, ClickHouse, Redis values, logs, URLs, and reports.
 
 ## Performance
 

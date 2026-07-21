@@ -9,6 +9,11 @@ export { getEmbedStats } from "./getEmbedStats.js";
 export { getSitesFromOrg } from "./getSitesFromOrg.js";
 export { moveSite } from "./moveSite.js";
 export { updateSiteConfig } from "./updateSiteConfig.js";
+export {
+  getSiteIdentitySettings,
+  rotateSiteIdentityKey,
+  updateSiteIdentitySettings,
+} from "./identitySettings.js";
 
 // Site Configuration
 export { getTrackingConfig } from "./getTrackingConfig.js";

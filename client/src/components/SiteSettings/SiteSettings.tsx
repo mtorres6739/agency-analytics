@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LayoutTemplate,
   Plug,
+  ShieldCheck,
   Settings,
   SlidersHorizontal,
   X,
@@ -30,6 +31,7 @@ import { IntegrationsTab } from "./IntegrationsTab";
 import { EmbedTab } from "./EmbedTab";
 import { DashboardEmbedTab } from "./DashboardEmbedTab";
 import { UsageTab } from "./UsageTab";
+import { IdentityTab } from "./IdentityTab";
 import { useGetSite } from "../../api/admin/hooks/useSites";
 import { useUserOrganizations } from "../../api/admin/hooks/useOrganizations";
 import { useGetSitesFromOrg } from "../../api/admin/hooks/useSites";
@@ -49,6 +51,7 @@ export function SiteSettings({ siteId, trigger }: { siteId: number; trigger?: Re
 type TabKey =
   | "general"
   | "tracking"
+  | "identity"
   | "exclusions"
   | "integrations"
   | "script"
@@ -103,6 +106,7 @@ function SiteSettingsInner({ siteMetadata, trigger }: { siteMetadata: SiteRespon
   const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; hidden?: boolean }[] = [
     { key: "general", label: t("General"), icon: Settings },
     { key: "tracking", label: t("Tracking"), icon: SlidersHorizontal },
+    { key: "identity", label: t("Identity"), icon: ShieldCheck },
     { key: "exclusions", label: t("Exclusions"), icon: Ban },
     { key: "integrations", label: t("Integrations"), icon: Plug, hidden: !IS_CLOUD },
     { key: "script", label: isMobileSite ? t("React Native SDK") : t("Tracking Script"), icon: Code },
@@ -180,6 +184,7 @@ function SiteSettingsInner({ siteMetadata, trigger }: { siteMetadata: SiteRespon
                 />
               )}
               {activeTab === "tracking" && <TrackingTab siteMetadata={currentSiteMetadata} disabled={disabled} />}
+              {activeTab === "identity" && <IdentityTab siteId={siteMetadata.siteId} disabled={disabled} />}
               {activeTab === "exclusions" && <ExclusionsTab siteId={siteMetadata.siteId} disabled={disabled} />}
               {activeTab === "integrations" && IS_CLOUD && <IntegrationsTab disabled={disabled} />}
               {activeTab === "script" && (

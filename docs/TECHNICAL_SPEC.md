@@ -139,3 +139,13 @@ Cloudflare-proxied WordPress uses the edge adapter. A DNS-only WordPress site ca
 ### Application integration
 
 The client onboarding UI invokes the provider contract through BullMQ. Every job reloads canonical organization/client/site assignment before execution; follow-up apply, status, and rollback jobs are bound to the original completed run. The browser receives sanitized plan/status data only. Provider tokens, repository credentials, and WordPress application passwords remain server-side.
+
+## Verified identified users
+
+- `site_identity_settings` owns the disabled-by-default mode, trait allowlist, retention, active key, and aggregate success/failure timestamps.
+- `site_identity_keys` stores only AES-256-GCM encrypted per-site secrets and deployment metadata. Rotation creates a pending key, writes it to the matching Vercel project as encrypted server-only environment variables, redeploys the last production build, and activates the key only after Vercel reports `READY`.
+- Signing and opaque subject IDs use separate HKDF-derived HMAC keys. Assertions expire after two minutes. Redis binds each `jti` to the anonymous visitor; same-visitor retries are idempotent and cross-visitor replay fails closed.
+- `POST /api/identify/verified` verifies the assertion and site, applies the server allowlist and 2 KB limit, links the anonymous device, and stores only `name`, `email`, `company`, and `plan`.
+- The legacy `/api/identify` endpoint works only when a site is explicitly switched to `direct` mode. The browser does not persist a direct ID until the server accepts it.
+- Identified-user list, detail, search, trait, mutation, and deletion endpoints require authenticated site access. Public dashboards and private links cannot read profile data.
+- `npm run identity:provision -- <site-id> --enable` is the controlled production bootstrap path. It refuses compliance-blocked domains and never prints the secret.

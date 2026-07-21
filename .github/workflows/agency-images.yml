@@ -27,7 +27,7 @@ jobs:
         working-directory: shared
       - run: npm ci && npm audit --omit=dev --audit-level=high
         working-directory: server
-      - run: npm run test:run -- src/lib/auth-middleware.test.ts src/api/agency src/api/sites/addSite.test.ts src/api/sites/deleteSite.test.ts src/services/tracker/trackEvent.test.ts src/services/trackingDeployment && npm run build
+      - run: npm run test:run -- src/lib/auth-middleware.test.ts src/api/agency src/api/sites/addSite.test.ts src/api/sites/deleteSite.test.ts src/services/tracker/trackEvent.test.ts src/services/trackingDeployment src/services/identity src/analytics-script/tracking.test.ts && npm run build
         working-directory: server
       - run: npm ci && npm audit --omit=dev --audit-level=high && npm run test:proxy && npx tsc --noEmit && npm run build
         working-directory: client

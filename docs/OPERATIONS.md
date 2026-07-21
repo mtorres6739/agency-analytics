@@ -86,3 +86,11 @@ Vercel sequence:
 The workstation Cloudflare deployment token is stored in macOS Keychain service `agency-analytics-cloudflare-tracking-edge`. It is limited to Workers script deployment plus zone/DNS read and Worker route changes for the 49 active zones present on 2026-07-19. Expand or rotate it when zones change; never replace it with the Global API key. Local operator scripts load Vercel and GitHub credentials from their authenticated CLIs; the production backend reads dedicated equivalents from its root-readable environment. Credentials are never printed or committed.
 
 For production onboarding, copy only the dedicated installer tokens into the root-readable server environment and pass them to the backend container. Do not reuse the Cloudflare Global API key. Rotate or remove the server-side tokens to immediately disable provider mutations; setting `TRACKING_INSTALLER_ENABLED=false` disables provider work and `TRACKING_AUTO_DEPLOY_ENABLED=false` stops site creation from provisioning or queuing automatic deployments.
+
+## Verified identity operations
+
+Set `IDENTITY_KEY_ENCRYPTION_SECRET` once in the root-readable production environment; changing it without a coordinated key rotation makes stored site secrets undecryptable. Keep `IDENTITY_BLOCKED_DOMAINS` aligned with the medical/legal compliance register.
+
+For an approved Vercel site, run `npm run identity:provision -- <numeric-site-id> --enable` inside the backend release. The command creates an encrypted pending key, writes `RYBBIT_IDENTITY_SECRET` and `RYBBIT_SITE_ID` to the exact Vercel project, starts a production redeploy, waits for readiness, then activates the key. Rotation preserves the old active key until the new deployment is ready and accepts the retired key only during the assertion grace window.
+
+The emergency kill switch is `enabled=false` in `site_identity_settings` or the Identity settings screen. It stops new identification immediately without interrupting anonymous pageviews. Do not enable a blocked medical or legal domain by editing the database; approval requires an explicit reviewed policy change.

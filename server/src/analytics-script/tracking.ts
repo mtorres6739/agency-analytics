@@ -425,19 +425,52 @@ export class Tracker {
       return;
     }
 
-    this.customUserId = userId.trim();
-    try {
-      localStorage.setItem(`${this.config.namespace}-user-id`, this.customUserId);
-    } catch (e) {
-      console.warn("Could not persist user ID to localStorage");
+    const candidateUserId = userId.trim();
+    // Direct identity is an opt-in compatibility mode. Never persist the ID in
+    // the browser until the server confirms that this site allows it.
+    void this.sendIdentifyEvent(candidateUserId, traits, true).then(async accepted => {
+      if (!accepted) return;
+      this.customUserId = candidateUserId;
+      try {
+        localStorage.setItem(`${this.config.namespace}-user-id`, candidateUserId);
+      } catch (e) {
+        console.warn("Could not persist user ID to localStorage");
+      }
+      this.sessionReplayRecorder?.updateUserId(candidateUserId);
+      await this.refreshFeatureFlags();
+    });
+  }
+
+  async identifyVerified(assertion: string): Promise<boolean> {
+    if (typeof assertion !== "string" || assertion.trim() === "") {
+      console.error("Identity assertion must be a non-empty string");
+      return false;
     }
+    try {
+      const response = await fetch(`${this.config.analyticsHost}/identify/verified`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site_id: this.config.siteId, assertion: assertion.trim() }),
+        mode: "cors",
+        credentials: "omit",
+        keepalive: true,
+      });
+      if (!response.ok) return false;
+      const result = (await response.json()) as { success?: boolean; user_id?: string };
+      if (!result.success || typeof result.user_id !== "string" || !result.user_id) return false;
 
-    // Send identify event to server (creates alias and stores traits)
-    void this.sendIdentifyEvent(this.customUserId, traits, true).then(() => this.refreshFeatureFlags());
-
-    // Update session replay recorder with new user ID
-    if (this.sessionReplayRecorder) {
-      this.sessionReplayRecorder.updateUserId(this.customUserId);
+      this.customUserId = result.user_id;
+      try {
+        localStorage.setItem(`${this.config.namespace}-user-id`, result.user_id);
+      } catch {
+        console.warn("Could not persist verified user ID to localStorage");
+      }
+      this.sessionReplayRecorder?.updateUserId(result.user_id);
+      await this.refreshFeatureFlags();
+      return true;
+    } catch (error) {
+      console.error("Failed to verify user identity:", error);
+      return false;
     }
   }
 
@@ -453,16 +486,18 @@ export class Tracker {
       return;
     }
 
-    void this.sendIdentifyEvent(userId, traits, false).then(() => this.refreshFeatureFlags());
+    void this.sendIdentifyEvent(userId, traits, false).then(accepted => {
+      if (accepted) return this.refreshFeatureFlags();
+    });
   }
 
   private async sendIdentifyEvent(
     userId: string,
     traits?: Record<string, unknown>,
     isNewIdentify: boolean = true
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
-      await fetch(`${this.config.analyticsHost}/identify`, {
+      const response = await fetch(`${this.config.analyticsHost}/identify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -476,8 +511,10 @@ export class Tracker {
         mode: "cors",
         keepalive: true,
       });
+      return response.ok;
     } catch (error) {
       console.error("Failed to send identify event:", error);
+      return false;
     }
   }
 

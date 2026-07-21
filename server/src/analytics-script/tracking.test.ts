@@ -18,16 +18,9 @@ describe("Tracker", () => {
     vi.mocked(global.fetch).mockReset();
     vi.mocked(global.fetch).mockResolvedValue({} as Response);
 
-    // Mock localStorage
-    const localStorageMock = {
-      getItem: vi.fn(),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-    };
-    Object.defineProperty(window, "localStorage", {
-      value: localStorageMock,
-      writable: true,
-    });
+    vi.spyOn(window.localStorage, "getItem").mockReturnValue(null);
+    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => undefined);
+    vi.spyOn(window.localStorage, "removeItem").mockImplementation(() => undefined);
 
     // Mock window properties
     mockLocation = {
@@ -111,7 +104,7 @@ describe("Tracker", () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe("createBasePayload", () => {
@@ -443,11 +436,51 @@ describe("Tracker", () => {
   });
 
   describe("user identification", () => {
-    it("should identify user", () => {
+    it("persists a user only after a verified assertion succeeds", async () => {
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, user_id: "id_verified" }),
+        } as Response)
+        .mockResolvedValueOnce({ ok: false } as Response);
+
+      await expect(tracker.identifyVerified("signed.assertion.value")).resolves.toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://analytics.example.com/identify/verified",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ site_id: "123", assertion: "signed.assertion.value" }),
+        })
+      );
+      expect(window.localStorage.setItem).toHaveBeenCalledWith(`${config.namespace}-user-id`, "id_verified");
+      expect(tracker.getUserId()).toBe("id_verified");
+    });
+
+    it("does not persist an identity when assertion verification fails", async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({ ok: false } as Response);
+      await expect(tracker.identifyVerified("rejected.assertion.value")).resolves.toBe(false);
+      expect(window.localStorage.setItem).not.toHaveBeenCalled();
+      expect(tracker.getUserId()).toBeNull();
+    });
+
+    it("should identify user only after direct mode is accepted", async () => {
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce({ ok: true } as Response)
+        .mockResolvedValueOnce({ ok: false } as Response);
       tracker.identify("user-456");
 
-      expect(window.localStorage.setItem).toHaveBeenCalledWith(`${config.namespace}-user-id`, "user-456");
-      expect(tracker.getUserId()).toBe("user-456");
+      await vi.waitFor(() => {
+        expect(window.localStorage.setItem).toHaveBeenCalledWith(`${config.namespace}-user-id`, "user-456");
+        expect(tracker.getUserId()).toBe("user-456");
+      });
+    });
+
+    it("does not persist a direct identity when the server rejects it", async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({ ok: false } as Response);
+      tracker.identify("user-rejected");
+      await Promise.resolve();
+      expect(window.localStorage.setItem).not.toHaveBeenCalled();
+      expect(tracker.getUserId()).toBeNull();
     });
 
     it("should validate user ID", () => {
@@ -460,7 +493,7 @@ describe("Tracker", () => {
       consoleSpy.mockRestore();
     });
 
-    it("should clear user ID", () => {
+    it("should clear user ID", async () => {
       const updateReplayUserId = vi.fn();
       (
         tracker as unknown as { sessionReplayRecorder: { updateUserId: (userId: string) => void } }
@@ -468,7 +501,9 @@ describe("Tracker", () => {
         updateUserId: updateReplayUserId,
       };
 
+      vi.mocked(global.fetch).mockResolvedValueOnce({ ok: true } as Response);
       tracker.identify("user-789");
+      await vi.waitFor(() => expect(tracker.getUserId()).toBe("user-789"));
       tracker.clearUserId();
 
       expect(window.localStorage.removeItem).toHaveBeenCalledWith(`${config.namespace}-user-id`);
@@ -476,14 +511,15 @@ describe("Tracker", () => {
       expect(updateReplayUserId).toHaveBeenLastCalledWith("");
     });
 
-    it("should handle localStorage errors", () => {
+    it("should handle localStorage errors", async () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.mocked(window.localStorage.setItem).mockImplementation(() => {
         throw new Error("Storage full");
       });
 
+      vi.mocked(global.fetch).mockResolvedValueOnce({ ok: true } as Response);
       tracker.identify("user-123");
-      expect(consoleSpy).toHaveBeenCalledWith("Could not persist user ID to localStorage");
+      await vi.waitFor(() => expect(consoleSpy).toHaveBeenCalledWith("Could not persist user ID to localStorage"));
 
       consoleSpy.mockRestore();
     });

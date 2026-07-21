@@ -119,9 +119,10 @@ export async function getUserInfo(
     ) AS events`;
 
   try {
-    const [queryResult, vitalsResult, locationsResult, devicesResult, profileResult, aliasesResult] = await Promise.all([
-      clickhouse.query({
-        query: `
+    const [queryResult, vitalsResult, locationsResult, devicesResult, profileResult, aliasesResult] = await Promise.all(
+      [
+        clickhouse.query({
+          query: `
     WITH sessions AS (
         SELECT
             session_id,
@@ -191,17 +192,17 @@ export async function getUserInfo(
     FROM
         sessions
       `,
-        query_params: {
-          userId,
-          site: siteId,
-        },
-        format: "JSONEachRow",
-      }),
-      // p75 Web Vitals across every performance event this user produced.
-      // Separate query: the sessions CTE collapses rows per session, which
-      // would turn an event-level quantile into a quantile of session picks.
-      clickhouse.query({
-        query: `
+          query_params: {
+            userId,
+            site: siteId,
+          },
+          format: "JSONEachRow",
+        }),
+        // p75 Web Vitals across every performance event this user produced.
+        // Separate query: the sessions CTE collapses rows per session, which
+        // would turn an event-level quantile into a quantile of session picks.
+        clickhouse.query({
+          query: `
     SELECT
         quantile(0.75)(lcp) AS lcp_p75,
         quantile(0.75)(cls) AS cls_p75,
@@ -212,16 +213,16 @@ export async function getUserInfo(
     FROM ${scopedEvents}
     WHERE type = 'performance'
       `,
-        query_params: {
-          userId,
-          site: siteId,
-        },
-        format: "JSONEachRow",
-      }),
-      // Every location this user was seen in, by session share. A session that
-      // moves between cities counts once per city, so shares are approximate.
-      clickhouse.query({
-        query: `
+          query_params: {
+            userId,
+            site: siteId,
+          },
+          format: "JSONEachRow",
+        }),
+        // Every location this user was seen in, by session share. A session that
+        // moves between cities counts once per city, so shares are approximate.
+        clickhouse.query({
+          query: `
     SELECT
         country,
         region,
@@ -236,17 +237,17 @@ export async function getUserInfo(
         sessions DESC, last_seen DESC
     LIMIT 20
       `,
-        query_params: {
-          userId,
-          site: siteId,
-        },
-        format: "JSONEachRow",
-      }),
-      // Every device this user was seen on. Grouped without versions so a
-      // browser update doesn't split one physical device into many rows;
-      // versions and screen are argMax'd to the latest sighting instead.
-      clickhouse.query({
-        query: `
+          query_params: {
+            userId,
+            site: siteId,
+          },
+          format: "JSONEachRow",
+        }),
+        // Every device this user was seen on. Grouped without versions so a
+        // browser update doesn't split one physical device into many rows;
+        // versions and screen are argMax'd to the latest sighting instead.
+        clickhouse.query({
+          query: `
     SELECT
         device_type,
         browser,
@@ -265,27 +266,28 @@ export async function getUserInfo(
         sessions DESC, last_seen DESC
     LIMIT 20
       `,
-        query_params: {
-          userId,
-          site: siteId,
-        },
-        format: "JSONEachRow",
-      }),
-      // Get user profile traits from Postgres
-      db
-        .select()
-        .from(userProfiles)
-        .where(and(eq(userProfiles.siteId, numericSiteId), eq(userProfiles.userId, userId)))
-        .limit(1),
-      // Get linked devices (all anonymous IDs for this user) from Postgres
-      db
-        .select({
-          anonymous_id: userAliases.anonymousId,
-          created_at: userAliases.createdAt,
-        })
-        .from(userAliases)
-        .where(and(eq(userAliases.siteId, numericSiteId), eq(userAliases.userId, userId))),
-    ]);
+          query_params: {
+            userId,
+            site: siteId,
+          },
+          format: "JSONEachRow",
+        }),
+        // Get user profile traits from Postgres
+        db
+          .select()
+          .from(userProfiles)
+          .where(and(eq(userProfiles.siteId, numericSiteId), eq(userProfiles.userId, userId)))
+          .limit(1),
+        // Get linked devices (all anonymous IDs for this user) from Postgres
+        db
+          .select({
+            anonymous_id: userAliases.anonymousId,
+            created_at: userAliases.createdAt,
+          })
+          .from(userAliases)
+          .where(and(eq(userAliases.siteId, numericSiteId), eq(userAliases.userId, userId))),
+      ]
+    );
 
     const data = await processResults<UserPageviewData>(queryResult);
     const vitalsData = await processResults<UserVitalsData>(vitalsResult);
@@ -301,6 +303,8 @@ export async function getUserInfo(
 
     let identifiedUserId = data[0].identified_user_id;
     let traits = profileResult[0]?.traits || null;
+    let identitySource = profileResult[0]?.identitySource || null;
+    let lastIdentifiedAt = profileResult[0]?.lastIdentifiedAt || null;
 
     // The identify backfill mutation in ClickHouse is async, so a freshly
     // identified device can still have all-blank identified_user_id here.
@@ -319,6 +323,8 @@ export async function getUserInfo(
           .where(and(eq(userProfiles.siteId, numericSiteId), eq(userProfiles.userId, identifiedUserId)))
           .limit(1);
         traits = aliasProfile[0]?.traits || traits;
+        identitySource = aliasProfile[0]?.identitySource || identitySource;
+        lastIdentifiedAt = aliasProfile[0]?.lastIdentifiedAt || lastIdentifiedAt;
       }
     }
 
@@ -334,6 +340,8 @@ export async function getUserInfo(
         ...data[0],
         identified_user_id: identifiedUserId,
         traits,
+        identity_source: identitySource,
+        last_identified_at: lastIdentifiedAt,
         linked_devices,
         vitals,
         locations,

@@ -35,6 +35,7 @@ declare global {
       error: () => {},
       trackOutbound: () => {},
       identify: () => {},
+      identifyVerified: async () => false,
       setTraits: () => {},
       clearUserId: () => {},
       getUserId: () => null,
@@ -65,6 +66,10 @@ declare global {
     error: queueMethod("error"),
     trackOutbound: queueMethod("trackOutbound"),
     identify: queueMethod("identify"),
+    identifyVerified: async (assertion: string) => {
+      earlyQueue.push(["identifyVerified", [assertion]]);
+      return false;
+    },
     setTraits: queueMethod("setTraits"),
     clearUserId: queueMethod("clearUserId"),
     getUserId: () => null,
@@ -213,6 +218,7 @@ declare global {
     trackOutbound: (url: string, text: string = "", target: string = "_self") =>
       tracker.trackOutbound(url, text, target),
     identify: (userId: string, traits?: Record<string, unknown>) => tracker.identify(userId, traits),
+    identifyVerified: (assertion: string) => tracker.identifyVerified(assertion),
     setTraits: (traits: Record<string, unknown>) => tracker.setTraits(traits),
     clearUserId: () => tracker.clearUserId(),
     getUserId: () => tracker.getUserId(),
