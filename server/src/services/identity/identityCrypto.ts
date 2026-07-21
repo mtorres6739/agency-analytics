@@ -193,7 +193,11 @@ export function verifyIdentityAssertion(input: {
     .update(`${parts[0]}.${parts[1]}`)
     .digest();
   const receivedSignature = Buffer.from(parts[2], "base64url");
-  if (receivedSignature.length !== expectedSignature.length || !timingSafeEqual(receivedSignature, expectedSignature)) {
+  if (
+    receivedSignature.toString("base64url") !== parts[2] ||
+    receivedSignature.length !== expectedSignature.length ||
+    !timingSafeEqual(receivedSignature, expectedSignature)
+  ) {
     throw new IdentityCryptoError("Identity assertion signature is invalid", "INVALID_ASSERTION");
   }
 
