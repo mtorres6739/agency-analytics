@@ -129,6 +129,7 @@ Deployment records use the internal numeric `site_id` for tenancy and job identi
 
 - `infra/tracking-vercel` resolves the Vercel project, connected GitHub repository, production branch, monorepo root, framework, TypeScript usage, and production CSP.
 - Next.js 15.3+ receives a single managed `instrumentation-client.ts|js` file, older App Router projects receive a managed root-layout integration, and Vite projects receive an idempotent script in the root `index.html`. Existing managed instrumentation is never overwritten.
+- When a Vercel project defines CSP response headers in `vercel.json`, the same preview pull request adds the analytics origin to every applicable `script-src` and `connect-src` directive. Existing sources and all unrelated directives remain unchanged; malformed or unrecognized configurations fail closed.
 - Apply creates an auditable `codex/agency-analytics-<siteId>` PR and Vercel's Git integration creates the preview. Operator-triggered apply stops at preview; the site-creation auto-deploy path waits for a ready preview before squash-merging.
 - Installation acceptance requires the Vercel preview to be ready, a real browser load with no tracker/CSP error, and a received event confirmed through the existing Agency Analytics **Verify** action.
 

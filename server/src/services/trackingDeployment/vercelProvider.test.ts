@@ -4,6 +4,7 @@ import {
   buildInstrumentation,
   buildNextConfigCspAllowance,
   buildStaticHtmlInstrumentation,
+  buildVercelJsonCspAllowance,
   hasManagedInstrumentation,
   supportsClientInstrumentation,
 } from "./vercelProvider.js";
@@ -54,6 +55,45 @@ describe("Vercel tracking source", () => {
     expect(source).toContain(`script-src 'self' 'unsafe-inline' https://analytics.example.com`);
     expect(source).toContain(`connect-src 'self' https://analytics.example.com`);
     expect(buildNextConfigCspAllowance(source, "https://analytics.example.com")).toBe(source);
+  });
+
+  it("adds the analytics origin to every Vercel CSP without broadening other sources", () => {
+    const config = `{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://js.stripe.com; connect-src 'self' https://api.stripe.com; object-src 'none'" }
+      ]
+    },
+    {
+      "source": "/private/(.*)",
+      "headers": [
+        { "key": "content-security-policy", "value": "default-src 'self'; object-src 'none'" }
+      ]
+    }
+  ]
+}\n`;
+    const source = buildVercelJsonCspAllowance(config, "https://analytics.example.com");
+    const parsed = JSON.parse(source);
+    const policies = parsed.headers.map((rule: any) => rule.headers[0].value);
+
+    expect(policies[0]).toContain("script-src 'self' https://js.stripe.com https://analytics.example.com");
+    expect(policies[0]).toContain("connect-src 'self' https://api.stripe.com https://analytics.example.com");
+    expect(policies[0]).toContain("object-src 'none'");
+    expect(policies[0]).not.toContain("*");
+    expect(policies[1]).toContain("script-src 'self' https://analytics.example.com");
+    expect(policies[1]).toContain("connect-src 'self' https://analytics.example.com");
+    expect(buildVercelJsonCspAllowance(source, "https://analytics.example.com")).toBe(source);
+  });
+
+  it("leaves Vercel configuration without a CSP unchanged", () => {
+    const config = `{"framework":"vite","headers":[]}\n`;
+    expect(buildVercelJsonCspAllowance(config, "https://analytics.example.com")).toBe(config);
+  });
+
+  it("rejects malformed Vercel configuration instead of silently weakening it", () => {
+    expect(() => buildVercelJsonCspAllowance("{", "https://analytics.example.com")).toThrow();
   });
 
   it("injects an idempotent tracker into a Vite HTML entrypoint", () => {
