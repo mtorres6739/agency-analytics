@@ -98,6 +98,18 @@ export function UserHeader({ userId, displayName, data, isLoading }: UserHeaderP
                   {displayName}
                 </h1>
                 {isIdentified && <IdentifiedBadge traits={data?.traits} userId={data?.identified_user_id} />}
+                {!isIdentified && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                        {t("Anonymous")}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t("This is a generated alias. Name and email appear only after verified identification.")}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 {data?.identity_source === "verified" && (
                   <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                     {t("Verified lead")}
