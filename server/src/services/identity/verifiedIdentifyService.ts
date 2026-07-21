@@ -87,7 +87,8 @@ export async function handleVerifiedIdentify(request: FastifyRequest, reply: Fas
         code: "REPLAY_STORE_UNAVAILABLE",
       });
     }
-    if (!inserted) {
+    const idempotent = !inserted;
+    if (idempotent) {
       const priorAnonymousId = await redis.get(replayKey);
       if (priorAnonymousId !== anonymousId) {
         await markIdentityResult(siteId, false);
@@ -97,7 +98,6 @@ export async function handleVerifiedIdentify(request: FastifyRequest, reply: Fas
           code: "ASSERTION_REPLAYED",
         });
       }
-      return reply.send({ success: true, user_id: claims.sub, idempotent: true });
     }
 
     const traits = allowlistedTraits(claims.traits, verification.settings.allowedTraits);
@@ -109,7 +109,7 @@ export async function handleVerifiedIdentify(request: FastifyRequest, reply: Fas
       identitySource: "verified",
     });
     await Promise.all([markIdentityResult(siteId, true), touchIdentityKey(verified.key.id)]);
-    return reply.send({ success: true, user_id: claims.sub });
+    return reply.send({ success: true, user_id: claims.sub, ...(idempotent ? { idempotent: true } : {}) });
   } catch (error) {
     await markIdentityResult(siteId, false).catch(() => undefined);
     if (error instanceof IdentityCryptoError) {

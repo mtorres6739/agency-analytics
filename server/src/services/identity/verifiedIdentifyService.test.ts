@@ -109,6 +109,28 @@ describe("verified identity endpoint", () => {
     expect(mocks.persist).not.toHaveBeenCalled();
   });
 
+  it("repeats the idempotent persistence step for a retry from the same visitor", async () => {
+    const assertion = createIdentityAssertion({
+      secret,
+      sitePublicId: "site_public",
+      source: "ghl",
+      externalId: "contact_retry",
+      traits: { name: "Retry User", email: "retry@example.com" },
+    });
+    mocks.redisSet.mockResolvedValue(null);
+    mocks.redisGet.mockResolvedValue("anonymous_1");
+    const reply = replyStub();
+
+    await handleVerifiedIdentify(request(assertion), reply);
+
+    expect(mocks.persist).toHaveBeenCalledOnce();
+    expect(reply.send).toHaveBeenCalledWith({
+      success: true,
+      user_id: expect.stringMatching(/^id_/),
+      idempotent: true,
+    });
+  });
+
   it("fails closed when the replay store is unavailable", async () => {
     const assertion = createIdentityAssertion({
       secret,
