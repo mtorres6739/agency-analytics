@@ -74,6 +74,8 @@ Verified identity uses short-lived signed assertions created only by a website b
 
 Palm Squad verified identity went live on 2026-07-21 with active key version 2. The first provisioning attempt failed closed and left key version 1 revoked when Vercel's deployment list returned `uid` instead of `id`; the provider now accepts both shapes and has a matching regression test. Palm uses the versioned tracker URL `script.js?v=verified-identity-v1` so Cloudflare's four-hour cache cannot retain the pre-identity script. Production release `cd34a5717e7636de706208712a7f4e0e28b58fee` passed the immutable-image workflow and Hetzner health-checked deployment. No synthetic production lead was submitted; the first real GHL-delivered lead is the live identification acceptance event.
 
+Anonymous visitors retain deterministic aliases for session continuity, but the user detail header explicitly labels those aliases `Anonymous`. Name and email are displayed only when the site has created a verified identified profile; ordinary pageviews cannot infer either trait.
+
 A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocks DNS-only Vercel domains; those projects use the Vercel/GitHub preview-PR adapter instead.
 
 ## Knowledge rule
