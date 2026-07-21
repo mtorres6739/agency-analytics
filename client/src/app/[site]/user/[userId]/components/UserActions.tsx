@@ -2,8 +2,11 @@
 
 import { useExtracted } from "next-intl";
 import { Trash2, UserPlus } from "lucide-react";
+import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { fetchIdentitySettings } from "@/api/admin/endpoints";
 import { UserInfo } from "@/api/analytics/endpoints";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,14 +20,23 @@ interface UserActionsProps {
 
 export function UserActions({ userId, data }: UserActionsProps) {
   const t = useExtracted();
+  const { site } = useParams<{ site: string }>();
   const [identifyOpen, setIdentifyOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const siteId = Number(site);
+  const { data: identityResponse } = useQuery({
+    queryKey: ["identity-settings", siteId],
+    queryFn: () => fetchIdentitySettings(siteId),
+    enabled: Number.isSafeInteger(siteId) && siteId > 0,
+    staleTime: 60_000,
+  });
 
   const isIdentified = !!data.identified_user_id;
+  const canIdentify = !!identityResponse?.settings.enabled && !identityResponse.settings.complianceBlocked;
 
   return (
     <div className="flex items-center gap-1">
-      {!isIdentified && (
+      {!isIdentified && canIdentify && (
         <Button size="sm" onClick={() => setIdentifyOpen(true)}>
           <UserPlus className="h-3.5 w-3.5 mr-1.5" />
           {t("Identify User")}
@@ -45,7 +57,9 @@ export function UserActions({ userId, data }: UserActionsProps) {
         <TooltipContent>{t("Delete User")}</TooltipContent>
       </Tooltip>
 
-      <IdentifyUserDialog anonymousId={data.user_id || userId} open={identifyOpen} onOpenChange={setIdentifyOpen} />
+      {canIdentify && (
+        <IdentifyUserDialog anonymousId={data.user_id || userId} open={identifyOpen} onOpenChange={setIdentifyOpen} />
+      )}
       <DeleteUserDialog userId={userId} open={deleteOpen} onOpenChange={setDeleteOpen} />
     </div>
   );

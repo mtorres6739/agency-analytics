@@ -1,8 +1,9 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../../db/postgres/postgres.js";
-import { userAliases, userProfiles } from "../../../db/postgres/schema.js";
+import { siteIdentitySettings, sites, userAliases, userProfiles } from "../../../db/postgres/schema.js";
+import { getIdentityComplianceBlock } from "../../../services/identity/identityCompliance.js";
 import { backfillIdentifiedUserId } from "../../../services/tracker/identifyService.js";
 import { auditSiteIdentityEvent } from "../../../services/identity/identityAuditService.js";
 
@@ -61,6 +62,26 @@ export async function identifyUser(req: FastifyRequest<IdentifyUserRequest>, res
   }
 
   try {
+    const [site] = await db
+      .select({
+        domain: sites.domain,
+        identityEnabled: siteIdentitySettings.enabled,
+      })
+      .from(sites)
+      .leftJoin(siteIdentitySettings, eq(siteIdentitySettings.siteId, sites.siteId))
+      .where(eq(sites.siteId, siteId))
+      .limit(1);
+    if (!site) {
+      return res.status(404).send({ error: "Site not found" });
+    }
+    const complianceReason = getIdentityComplianceBlock(site.domain);
+    if (complianceReason) {
+      return res.status(423).send({ error: complianceReason, code: "COMPLIANCE_BLOCKED" });
+    }
+    if (!site.identityEnabled) {
+      return res.status(409).send({ error: "Identity is disabled for this site", code: "IDENTITY_DISABLED" });
+    }
+
     const filteredTraits = traits ? Object.fromEntries(Object.entries(traits).filter(([, v]) => v !== null)) : {};
 
     if (Object.keys(filteredTraits).length > 0) {

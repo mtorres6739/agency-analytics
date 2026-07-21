@@ -76,6 +76,8 @@ Palm Squad verified identity went live on 2026-07-21 with active key version 2. 
 
 Anonymous visitors retain deterministic aliases for session continuity, but the user detail header explicitly labels those aliases `Anonymous`. Name and email are displayed only when the site has created a verified identified profile; ordinary pageviews cannot infer either trait.
 
+The identity kill switch applies to every identity source, including dashboard-initiated manual identification. Compliance-blocked or disabled sites do not render the manual action, and the server independently rejects attempts with a stable policy error.
+
 A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocks DNS-only Vercel domains; those projects use the Vercel/GitHub preview-PR adapter instead.
 
 ## Knowledge rule
