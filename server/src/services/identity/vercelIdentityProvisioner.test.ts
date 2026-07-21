@@ -11,10 +11,10 @@ describe("VercelIdentityProvisioner", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(response({ projects: [{ id: "prj_1", name: "palm-squad" }], pagination: {} }))
       .mockResolvedValueOnce(response({ domains: [{ name: "www.palmsquad.com" }] }))
-      .mockResolvedValueOnce(response({ deployments: [{ id: "dpl_old", readyState: "READY" }] }))
+      .mockResolvedValueOnce(response({ deployments: [{ uid: "dpl_old", readyState: "READY" }] }))
       .mockResolvedValueOnce(response({ created: { id: "env_1" }, failed: [] }, true, 201))
       .mockResolvedValueOnce(response({ created: { id: "env_2" }, failed: [] }, true, 201))
-      .mockResolvedValueOnce(response({ id: "dpl_new", readyState: "QUEUED" }, true, 201));
+      .mockResolvedValueOnce(response({ uid: "dpl_new", readyState: "QUEUED" }, true, 201));
     const provider = new VercelIdentityProvisioner("token", "team_1", fetchImpl);
 
     await expect(
