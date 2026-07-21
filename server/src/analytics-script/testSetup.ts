@@ -21,10 +21,11 @@ const localStoragePolyfill: Storage = {
   },
 };
 
-if (typeof globalThis.localStorage?.clear !== "function") {
-  Object.defineProperty(globalThis, "localStorage", {
-    value: localStoragePolyfill,
-    configurable: true,
-    writable: true,
-  });
-}
+// Always replace jsdom/Node storage with one stable, configurable object.
+// Tracking tests restore spies between cases; jsdom's accessor-backed Storage
+// can otherwise yield non-spy methods after a restore in clean CI workers.
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStoragePolyfill,
+  configurable: true,
+  writable: true,
+});
