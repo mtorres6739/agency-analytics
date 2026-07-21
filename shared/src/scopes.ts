@@ -13,6 +13,7 @@ export const SCOPE_MATRIX = {
   sessions: ["read"],
   events: ["read"],
   users: ["read", "write"],
+  identity: ["read", "write"],
   goals: ["read", "write"],
   funnels: ["read", "write"],
   dashboards: ["read", "write"],

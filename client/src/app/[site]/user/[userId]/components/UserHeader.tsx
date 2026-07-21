@@ -115,6 +115,11 @@ export function UserHeader({ userId, displayName, data, isLoading }: UserHeaderP
                     {t("Verified lead")}
                   </span>
                 )}
+                {data?.identity_source === "resolved" && (
+                  <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                    {t("Resolved identity")}
+                  </span>
+                )}
               </div>
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
                 {isOnline ? (

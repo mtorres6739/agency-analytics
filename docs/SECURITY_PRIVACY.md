@@ -69,3 +69,10 @@ As of 2026-07-19, `npm audit --omit=dev` reports zero production advisories for 
 4. Restore from a verified clean release or backup.
 5. Notify stakeholders according to contractual and legal requirements.
 6. Document the cause and add a regression control.
+## Provider-derived identity
+
+Provider resolution is separate from cookieless analytics and requires affirmative identification consent. GPC always suppresses resolution. The only allowed normalized fields are name, email, company, title, LinkedIn URL, and coarse location. Phone is disabled in the schema. Birth dates, home addresses, health or legal interests, messages, symptoms, form answers, and page-derived sensitive classifications are rejected.
+
+Raw IP and user-agent data may exist only inside an AES-256-GCM encrypted BullMQ payload that expires within ten minutes. Provider responses are validated against a strict allowlist and discarded after normalization. Provider subject IDs become site-scoped HMAC keys. Webhooks require raw-body HMAC validation, timestamp checking, replay protection, correlation-token site binding, and active consent.
+
+Withdrawal deletes the resolved profile, aliases, candidates, consent state, and associated analytics/replay data while retaining only a non-reversible suppression HMAC and minimum audit evidence. Medical, health, legal, and simulated-delivery domain blocks apply before settings or consent and cannot be bypassed from the client.

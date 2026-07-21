@@ -79,7 +79,7 @@ export async function persistIdentifiedUser(input: {
   userId: string;
   traits?: Record<string, unknown>;
   isNewIdentify?: boolean;
-  identitySource?: "direct" | "verified" | "dashboard";
+  identitySource?: "direct" | "verified" | "dashboard" | "resolved";
 }) {
   const { siteId, anonymousId, userId, traits, isNewIdentify = true, identitySource = "direct" } = input;
   const identifiedAt = new Date().toISOString();

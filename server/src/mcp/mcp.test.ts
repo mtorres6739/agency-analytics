@@ -318,11 +318,11 @@ describe("mcp endpoint", () => {
     expect(result.instructions).toContain("run_query");
   });
 
-  it("lists all 39 tools with output schemas", async () => {
+  it("lists all 45 tools with output schemas", async () => {
     const tools = await listTools(app);
     const names = tools.map(tool => tool.name);
 
-    expect(tools).toHaveLength(39);
+    expect(tools).toHaveLength(45);
     expect(names).toContain("list_sites");
     expect(names).toContain("get_overview");
     expect(names).toContain("get_breakdown");
@@ -333,6 +333,8 @@ describe("mcp endpoint", () => {
     expect(names).toContain("create_goal");
     expect(names).toContain("get_users");
     expect(names).toContain("list_members");
+    expect(names).toContain("get_identity_candidates");
+    expect(names).toContain("approve_identity_candidate");
 
     const overview = tools.find(tool => tool.name === "get_overview");
     expect(overview?.outputSchema).toBeTruthy();
@@ -360,7 +362,7 @@ describe("mcp endpoint", () => {
 
   it("legacy OAuth grants with only standard scopes stay unrestricted", async () => {
     const tools = await listTools(app, "Bearer oauth_valid_token");
-    expect(tools).toHaveLength(39);
+    expect(tools).toHaveLength(45);
   });
 
   it("partitions tools into reads, writes, and destructive deletes", async () => {
@@ -372,7 +374,14 @@ describe("mcp endpoint", () => {
       .filter(tool => tool.annotations?.destructiveHint)
       .map(tool => tool.name)
       .sort();
-    expect(destructive).toEqual(["delete_funnel", "delete_goal", "delete_site", "delete_team", "delete_user"]);
+    expect(destructive).toEqual([
+      "delete_funnel",
+      "delete_goal",
+      "delete_site",
+      "delete_team",
+      "delete_user",
+      "suppress_identity_candidate",
+    ]);
 
     const writes = tools
       .filter(tool => tool.annotations?.readOnlyHint === false)
@@ -381,6 +390,7 @@ describe("mcp endpoint", () => {
     expect(writes).toEqual(
       [
         "add_member",
+        "approve_identity_candidate",
         "create_goal",
         "create_site",
         "create_team",
@@ -390,7 +400,10 @@ describe("mcp endpoint", () => {
         "delete_team",
         "delete_user",
         "identify_user",
+        "generate_identity_lead_brief",
+        "reject_identity_candidate",
         "save_funnel",
+        "suppress_identity_candidate",
         "update_goal",
         "update_member_site_access",
         "update_site_config",

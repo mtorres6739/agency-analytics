@@ -120,6 +120,48 @@
       "when": 1784643307712,
       "tag": "0016_verified_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784650616157,
+      "tag": "0017_mighty_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784651383442,
+      "tag": "0018_careless_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784652180615,
+      "tag": "0019_premium_nuke",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784652866964,
+      "tag": "0020_lonely_iron_lad",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1784653542997,
+      "tag": "0021_long_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784654051655,
+      "tag": "0022_volatile_maelstrom",
+      "breakpoints": true
     }
   ]
 }

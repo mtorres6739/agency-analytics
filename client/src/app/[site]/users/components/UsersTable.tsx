@@ -131,7 +131,7 @@ export function UsersTable() {
     searchField,
   });
 
-  const pageHasTrait = (key: "company" | "plan") =>
+  const pageHasTrait = (key: "company" | "plan" | "title" | "linkedinUrl" | "location") =>
     (data?.data ?? []).some(user => typeof user.traits?.[key] === "string" && String(user.traits[key]).trim());
 
   const columns = [
@@ -199,6 +199,10 @@ export function UsersTable() {
           <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
             {t("Verified lead")}
           </span>
+        ) : info.row.original.identity_source === "resolved" ? (
+          <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+            {t("Resolved")}
+          </span>
         ) : info.row.original.identified_user_id ? (
           <span className="text-xs text-neutral-500 dark:text-neutral-400">{t("Direct")}</span>
         ) : (
@@ -237,6 +241,27 @@ export function UsersTable() {
               ) : (
                 "—"
               );
+            },
+          }),
+        ]
+      : []),
+    ...(pageHasTrait("title")
+      ? [
+          columnHelper.display({
+            id: "title",
+            header: t("Title"),
+            cell: info => <span className="block max-w-40 truncate">{String(info.row.original.traits?.title ?? "—")}</span>,
+          }),
+        ]
+      : []),
+    ...(pageHasTrait("linkedinUrl")
+      ? [
+          columnHelper.display({
+            id: "linkedinUrl",
+            header: t("LinkedIn"),
+            cell: info => {
+              const url = info.row.original.traits?.linkedinUrl;
+              return typeof url === "string" ? <a href={url} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">Profile</a> : "—";
             },
           }),
         ]

@@ -27,6 +27,17 @@ class IdentityRetentionService {
       SELECT count(*)::int AS deleted_profiles FROM deleted_profiles
     `);
     const count = Number(result[0]?.deleted_profiles ?? 0);
+    await Promise.all([
+      db.execute(sql`DELETE FROM identity_candidates WHERE expires_at < now()`),
+      db.execute(sql`DELETE FROM identity_resolution_attempts WHERE started_at < now() - interval '395 days'`),
+      db.execute(sql`
+        DELETE FROM identity_consent_receipts
+        WHERE created_at < now() - interval '395 days' AND (granted = false OR withdrawn_at IS NOT NULL)
+      `),
+      db.execute(
+        sql`DELETE FROM identity_provider_usage WHERE usage_date < to_char(now() - interval '395 days', 'YYYY-MM-DD')`
+      ),
+    ]);
     if (count > 0) this.logger.info({ count }, "Expired identified profiles deleted");
     return count;
   }

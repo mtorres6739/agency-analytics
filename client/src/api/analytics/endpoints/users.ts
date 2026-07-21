@@ -234,3 +234,54 @@ export async function deleteUser(site: string | number, userId: string): Promise
     method: "DELETE",
   });
 }
+
+export type IdentityCandidate = {
+  id: string;
+  siteId: number;
+  provider: "customers_ai" | "rb2b";
+  confidence: number;
+  matchMethod: "deterministic" | "probabilistic";
+  traits: Record<string, string | undefined>;
+  provenance: Array<{ field: string; provider: string; confidence: number; observedAt: string }>;
+  reviewStatus: "pending" | "approved" | "rejected" | "suppressed" | "expired";
+  linkedUserId: string | null;
+  crmContactId: string | null;
+  icpScore: number | null;
+  aiBrief: string | null;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export async function fetchIdentityCandidates(site: string | number) {
+  return authedFetch<{ data: IdentityCandidate[]; totalCount: number }>(`/sites/${site}/identity-candidates`, {
+    page: 1,
+    pageSize: 100,
+  });
+}
+
+export async function reviewIdentityCandidate(
+  site: string | number,
+  candidateId: string,
+  action: "approve" | "reject" | "suppress",
+  sendToCrm = false
+) {
+  return authedFetch<{ success: boolean }>(
+    `/sites/${site}/identity-candidates/${candidateId}/${action}`,
+    undefined,
+    { method: "POST", data: { sendToCrm } }
+  );
+}
+
+export async function fetchIdentityProviderUsage(site: string | number) {
+  return authedFetch<{
+    totals: { requests: number; matches: number; failures: number; estimatedCostDollars: number };
+  }>(`/sites/${site}/provider-usage`);
+}
+
+export async function generateIdentityLeadBrief(site: string | number, candidateId: string) {
+  return authedFetch<{ score: number; reasons: string[]; brief: string }>(
+    `/sites/${site}/identity-candidates/${candidateId}/brief`,
+    undefined,
+    { method: "POST" }
+  );
+}

@@ -5,7 +5,15 @@ import { db } from "../../db/postgres/postgres.js";
 import { siteIdentityKeys, siteIdentitySettings } from "../../db/postgres/schema.js";
 import { decryptIdentitySecret, encryptIdentitySecret, generateIdentitySecret } from "./identityCrypto.js";
 
-export const DEFAULT_IDENTITY_TRAITS: IdentityTraitKey[] = ["name", "email", "company", "plan"];
+export const DEFAULT_IDENTITY_TRAITS: IdentityTraitKey[] = [
+  "name",
+  "email",
+  "company",
+  "plan",
+  "title",
+  "linkedinUrl",
+  "location",
+];
 
 export function serializeIdentitySettings(
   siteId: number,

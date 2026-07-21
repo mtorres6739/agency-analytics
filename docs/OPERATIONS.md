@@ -94,3 +94,11 @@ Set `IDENTITY_KEY_ENCRYPTION_SECRET` once in the root-readable production enviro
 For an approved Vercel site, run `npm run identity:provision -- <numeric-site-id> --enable` inside the backend release. The command creates an encrypted pending key, writes `RYBBIT_IDENTITY_SECRET` and `RYBBIT_SITE_ID` to the exact Vercel project, starts a production redeploy, waits for readiness, then activates the key. Rotation preserves the old active key until the new deployment is ready and accepts the retired key only during the assertion grace window.
 
 The emergency kill switch is `enabled=false` in `site_identity_settings` or the Identity settings screen. It stops new identification immediately without interrupting anonymous pageviews. Do not enable a blocked medical or legal domain by editing the database; approval requires an explicit reviewed policy change.
+
+## Provider-neutral identity operations
+
+Apply Drizzle migrations `0017` through `0022` before starting a release containing provider identity. Configure only the approved provider's server variables from `infra/agency/.env.production.example`; leave unused providers blank. The backend refuses site activation unless the provider connection has durable contract attestations, a successful health check, the required transport and deletion capabilities, and the site compliance state is approved. A configured key by itself does not activate resolution.
+
+Use the Site Settings Identity tab for the site kill switch, shadow mode, resolver selection, PDL toggle, daily cap, and monthly cap. Use the organization provider APIs for contract attestations and health checks. The maximum accepted per-site monthly cap is $750, and `IDENTITY_PILOT_MONTHLY_BUDGET_CENTS` enforces an atomic organization-wide cap that can never exceed $750. `IDENTITY_CONNECTOR_URL`, when used for a pixel bridge, must be served from the analytics origin so managed websites never need a vendor-specific script or CSP entry.
+
+During an incident, disable `site_resolution_settings.enabled` first. Removing provider API keys and webhook secrets disables external calls globally. Anonymous analytics remains available. See `docs/PROVIDER_IDENTITY.md` for activation, webhook, withdrawal, and pilot acceptance details.

@@ -1,5 +1,5 @@
 import { authedFetch } from "../../utils";
-import type { IdentitySettings, IdentityTraitKey } from "@rybbit/shared";
+import type { IdentitySettings, IdentityTraitKey, SiteResolutionSettings } from "@rybbit/shared";
 
 export type SiteResponse = {
   id: string | null;
@@ -205,7 +205,42 @@ export function rotateIdentityKey(siteId: string | number) {
   });
 }
 
-export type { IdentitySettings, IdentityTraitKey };
+export function fetchResolutionSettings(siteId: string | number) {
+  return authedFetch<{
+    settings: SiteResolutionSettings;
+    complianceBlocked: boolean;
+    complianceReason: string | null;
+  }>(`/sites/${siteId}/resolution-settings`);
+}
+
+export function updateResolutionSettings(
+  siteId: string | number,
+  input: Partial<
+    Pick<
+      SiteResolutionSettings,
+      | "enabled"
+      | "mode"
+      | "primaryProvider"
+      | "transport"
+      | "enrichmentProvider"
+      | "enrichmentEnabled"
+      | "shadowMode"
+      | "deterministicThreshold"
+      | "enrichmentThreshold"
+      | "dailyCap"
+      | "monthlyBudgetCents"
+      | "complianceState"
+      | "policyVersion"
+    >
+  >
+) {
+  return authedFetch<{ settings: SiteResolutionSettings }>(`/sites/${siteId}/resolution-settings`, undefined, {
+    method: "PATCH",
+    data: input,
+  });
+}
+
+export type { IdentitySettings, IdentityTraitKey, SiteResolutionSettings };
 
 export type SiteUsageResponse = {
   periodStart: string;

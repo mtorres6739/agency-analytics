@@ -1,6 +1,7 @@
 import cluster from "node:cluster";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
+import fastifyRawBody from "fastify-raw-body";
 import { toNodeHandler } from "better-auth/node";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { dirname, join } from "path";
@@ -155,12 +156,28 @@ import {
   getSitesFromOrg,
   getTrackingConfig,
   getSiteIdentitySettings,
+  getResolutionSettings,
+  getProviderUsage,
+  generateIdentityCandidateBrief,
+  listIdentityCandidates,
+  approveIdentityCandidate,
+  rejectIdentityCandidate,
+  suppressIdentityCandidate,
   moveSite,
   rotateSiteIdentityKey,
   updateSiteConfig,
   updateSiteIdentitySettings,
+  updateResolutionSettings,
   updateSitePrivateLinkConfig,
 } from "./api/sites/index.js";
+import {
+  handleIdentityConsent,
+  handleIdentityProviderWebhook,
+  handleIdentityWithdrawal,
+  listIdentityProviderConnections,
+  testIdentityProviderConnection,
+  upsertIdentityProviderConnection,
+} from "./api/identity/index.js";
 import {
   createCheckoutSession,
   createPortalSession,
@@ -208,6 +225,7 @@ import { telemetryService } from "./services/telemetryService.js";
 import { handleIdentify } from "./services/tracker/identifyService.js";
 import { handleVerifiedIdentify } from "./services/identity/verifiedIdentifyService.js";
 import { identityRetentionService } from "./services/identity/identityRetentionService.js";
+import { identityResolutionService } from "./services/identityResolution/resolutionService.js";
 import { trackEvent } from "./services/tracker/trackEvent.js";
 import { usageService } from "./services/usageService.js";
 import { weeklyReportService } from "./services/weekyReports/weeklyReportService.js";
@@ -273,10 +291,12 @@ const authDashboardsWrite = authSiteScoped("dashboards", "write");
 const authFlagsRead = authSiteScoped("flags", "read");
 const authExperimentsRead = authSiteScoped("experiments", "read");
 const authSitesRead = authSiteScoped("sites", "read");
+const authIdentityRead = authSiteScoped("identity", "read");
 const adminUsersWrite = adminSiteScoped("users", "write");
 const adminFlagsWrite = adminSiteScoped("flags", "write");
 const adminExperimentsWrite = adminSiteScoped("experiments", "write");
 const adminSitesWrite = adminSiteScoped("sites", "write");
+const adminIdentityWrite = adminSiteScoped("identity", "write");
 const adminGscWrite = adminSiteScoped("gsc", "write");
 const orgAnalyticsRead = orgMemberScoped("analytics", "read");
 const orgSqlRead = orgMemberScoped("sql", "read");
@@ -333,6 +353,7 @@ const server = Fastify({
 server.register(cors, {
   delegator: createCorsOptionsDelegate(),
 });
+server.register(fastifyRawBody, { field: "rawBody", global: false, encoding: false, runFirst: true });
 server.addHook("onRequest", createRejectUntrustedOriginHook());
 
 // Serve static files
@@ -488,6 +509,30 @@ async function sitesRoutes(fastify: FastifyInstance) {
   fastify.get("/sites/:siteId/identity-settings", authSitesRead, getSiteIdentitySettings);
   fastify.patch("/sites/:siteId/identity-settings", adminSitesWrite, updateSiteIdentitySettings);
   fastify.post("/sites/:siteId/identity-keys/rotate", adminSitesWrite, rotateSiteIdentityKey);
+  fastify.get("/sites/:siteId/resolution-settings", authIdentityRead, getResolutionSettings);
+  fastify.patch("/sites/:siteId/resolution-settings", adminIdentityWrite, updateResolutionSettings);
+  fastify.get("/sites/:siteId/identity-candidates", authIdentityRead, listIdentityCandidates);
+  fastify.post(
+    "/sites/:siteId/identity-candidates/:candidateId/approve",
+    adminIdentityWrite,
+    approveIdentityCandidate
+  );
+  fastify.post(
+    "/sites/:siteId/identity-candidates/:candidateId/reject",
+    adminIdentityWrite,
+    rejectIdentityCandidate
+  );
+  fastify.post(
+    "/sites/:siteId/identity-candidates/:candidateId/suppress",
+    adminIdentityWrite,
+    suppressIdentityCandidate
+  );
+  fastify.get("/sites/:siteId/provider-usage", authIdentityRead, getProviderUsage);
+  fastify.post(
+    "/sites/:siteId/identity-candidates/:candidateId/brief",
+    adminIdentityWrite,
+    generateIdentityCandidateBrief
+  );
   fastify.put("/sites/:siteId/move", adminSitesWrite, moveSite);
   fastify.delete("/sites/:siteId", adminSitesWrite, deleteSite);
   fastify.get("/sites/:siteId/private-link-config", adminSitesWrite, getSitePrivateLinkConfig);
@@ -522,6 +567,17 @@ async function organizationsRoutes(fastify: FastifyInstance) {
   fastify.get("/organizations/:organizationId/members", orgOrgRead, listOrganizationMembers);
   fastify.post("/organizations/:organizationId/members", authOrgWrite, addUserToOrganization);
   fastify.post("/organizations/:organizationId/users", authOrgWrite, createUserInOrganization);
+  fastify.post(
+    "/organizations/:organizationId/providers/:provider/test",
+    orgAdminOrgWrite,
+    testIdentityProviderConnection
+  );
+  fastify.get("/organizations/:organizationId/providers", orgOrgRead, listIdentityProviderConnections);
+  fastify.put(
+    "/organizations/:organizationId/providers/:provider",
+    orgAdminOrgWrite,
+    upsertIdentityProviderConnection
+  );
 
   // Member site access management (admin/owner only)
   fastify.put("/organizations/:organizationId/members/:memberId/sites", orgAdminOrgWrite, updateMemberSiteAccess);
@@ -683,6 +739,13 @@ async function apiRoutes(fastify: FastifyInstance) {
 server.post("/api/track", trackEvent);
 server.post("/api/identify", handleIdentify);
 server.post("/api/identify/verified", handleVerifiedIdentify);
+server.post("/api/identity/consent", { bodyLimit: 8 * 1024 }, handleIdentityConsent);
+server.post("/api/identity/withdraw", { bodyLimit: 8 * 1024 }, handleIdentityWithdrawal);
+server.post(
+  "/api/identity/provider-webhooks/:provider",
+  { config: { rawBody: true }, bodyLimit: 64 * 1024 },
+  handleIdentityProviderWebhook
+);
 
 // Register API routes with /api prefix
 server.register(apiRoutes, { prefix: "/api" });
@@ -700,6 +763,7 @@ const start = async () => {
       usageService.startUsageCheckCron();
       await agencyReportService.initialize();
       await trackingDeploymentService.initialize();
+      await identityResolutionService.initialize();
       identityRetentionService.start();
       if (IS_CLOUD && process.env.NODE_ENV !== "development") {
         weeklyReportService.startWeeklyReportCron();
@@ -769,6 +833,7 @@ const shutdown = async (signal: string) => {
 
     await agencyReportService.shutdown();
     await trackingDeploymentService.shutdown();
+    await identityResolutionService.shutdown();
 
     // Shutdown uptime service
     // await uptimeService.shutdown();

@@ -1,0 +1,2 @@
+ALTER TABLE "site_resolution_settings" ADD COLUMN "transport" text DEFAULT 'server' NOT NULL;--> statement-breakpoint
+ALTER TABLE "site_resolution_settings" ADD CONSTRAINT "site_resolution_settings_transport_check" CHECK ("site_resolution_settings"."transport" IN ('server', 'pixel'));

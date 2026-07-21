@@ -6,6 +6,7 @@ import { CopyTrackingManager } from "./copyTracking.js";
 import { FormTrackingManager } from "./formTracking.js";
 import { debounce, isOutboundLink } from "./utils.js";
 import { RybbitAPI, WebVitalsData, ErrorProperties } from "./types.js";
+import { IdentityConsentManager } from "./identityConsent.js";
 
 declare global {
   interface Window {
@@ -36,6 +37,10 @@ declare global {
       trackOutbound: () => {},
       identify: () => {},
       identifyVerified: async () => false,
+      consentIdentification: async () => false,
+      rejectIdentification: async () => false,
+      withdrawIdentification: async () => false,
+      getIdentificationConsent: () => ({ status: "denied", gpc: true }),
       setTraits: () => {},
       clearUserId: () => {},
       getUserId: () => null,
@@ -70,6 +75,10 @@ declare global {
       earlyQueue.push(["identifyVerified", [assertion]]);
       return false;
     },
+    consentIdentification: async () => false,
+    rejectIdentification: async () => false,
+    withdrawIdentification: async () => false,
+    getIdentificationConsent: () => ({ status: "unknown", gpc: false }),
     setTraits: queueMethod("setTraits"),
     clearUserId: queueMethod("clearUserId"),
     getUserId: () => null,
@@ -91,6 +100,7 @@ declare global {
 
   // Initialize tracker
   const tracker = new Tracker(config);
+  const identityConsent = new IdentityConsentManager(config);
 
   // Initialize web vitals if enabled
   if (config.enableWebVitals) {
@@ -219,6 +229,10 @@ declare global {
       tracker.trackOutbound(url, text, target),
     identify: (userId: string, traits?: Record<string, unknown>) => tracker.identify(userId, traits),
     identifyVerified: (assertion: string) => tracker.identifyVerified(assertion),
+    consentIdentification: () => identityConsent.grant(),
+    rejectIdentification: () => identityConsent.reject(),
+    withdrawIdentification: () => identityConsent.withdraw(),
+    getIdentificationConsent: () => identityConsent.getState(),
     setTraits: (traits: Record<string, unknown>) => tracker.setTraits(traits),
     clearUserId: () => tracker.clearUserId(),
     getUserId: () => tracker.getUserId(),
@@ -240,6 +254,7 @@ declare global {
 
   // Initialize
   setupEventListeners();
+  void identityConsent.initialize();
 
   // Setup cleanup on page unload
   window.addEventListener("beforeunload", () => {

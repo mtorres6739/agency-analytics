@@ -14,6 +14,16 @@ export {
   rotateSiteIdentityKey,
   updateSiteIdentitySettings,
 } from "./identitySettings.js";
+export {
+  approveIdentityCandidate,
+  getProviderUsage,
+  generateIdentityCandidateBrief,
+  getResolutionSettings,
+  listIdentityCandidates,
+  rejectIdentityCandidate,
+  suppressIdentityCandidate,
+  updateResolutionSettings,
+} from "./resolutionIdentity.js";
 
 // Site Configuration
 export { getTrackingConfig } from "./getTrackingConfig.js";

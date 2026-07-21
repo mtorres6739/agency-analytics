@@ -19,6 +19,7 @@ This repository is a maintained AGPL fork of Rybbit for agency-wide client analy
 - [Roadmap](../docs/ROADMAP.md)
 - [Test and acceptance](../docs/TEST_ACCEPTANCE.md)
 - [Upstream audit revalidation](../docs/UPSTREAM_AUDIT_REVALIDATION.md)
+- [Provider-neutral identity operations](../docs/PROVIDER_IDENTITY.md)
 
 ## Durable boundaries
 
@@ -76,6 +77,8 @@ Verified identity uses short-lived signed assertions created only by a website b
 Palm Squad verified identity went live on 2026-07-21 with active key version 2. The first provisioning attempt failed closed and left key version 1 revoked when Vercel's deployment list returned `uid` instead of `id`; the provider now accepts both shapes and has a matching regression test. Palm uses the versioned tracker URL `script.js?v=verified-identity-v1` so Cloudflare's four-hour cache cannot retain the pre-identity script. Production release `cd34a5717e7636de706208712a7f4e0e28b58fee` passed the immutable-image workflow and Hetzner health-checked deployment. No synthetic production lead was submitted; the first real GHL-delivered lead is the live identification acceptance event.
 
 Anonymous visitors retain deterministic aliases for session continuity, but the user detail header explicitly labels those aliases `Anonymous`. Name and email are displayed only when the site has created a verified identified profile; ordinary pageviews cannot infer either trait.
+
+Provider-neutral visitor identity is implemented behind fail-closed policy gates on `codex/provider-neutral-identity`. CustomersAI and RB2B adapters use configurable signed sandbox endpoints; PDL can fill only missing allowed fields. The SDM tracker owns affirmative consent, honors GPC, restricts resolution to server-derived US traffic, creates encrypted ten-minute BullMQ jobs, stores normalized candidates and field provenance, atomically reserves site and organization budgets, and maintains suppression hashes. Provider identifiers are encrypted only for retryable provider deletion and never returned through application APIs. The Users screen owns the Possible matches review queue, deterministic ICP score, bounded AI brief, and explicit optional GHL routing. OSPRY is excluded. No provider is live until its DPA, data rights, deletion support, sandbox schema, health test, and sub-$750 commitment are approved; Palm Squad remains the shadow-mode consumer pilot.
 
 The identity kill switch applies to every identity source, including dashboard-initiated manual identification. Compliance-blocked or disabled sites do not render the manual action, and the server independently rejects attempts with a stable policy error.
 

@@ -185,6 +185,9 @@ export async function parseScriptConfig(scriptTag: HTMLScriptElement): Promise<S
     trackFormInteractions: false,
     tag,
     featureFlags: {},
+    identityResolutionEnabled: false,
+    identityPolicyVersion: "identity-v1",
+    identityConnectorUrl: null,
     // rrweb session replay options (undefined means use rrweb defaults)
     sessionReplayBlockClass,
     sessionReplayBlockSelector,
@@ -227,6 +230,11 @@ export async function parseScriptConfig(scriptTag: HTMLScriptElement): Promise<S
         trackButtonClicks: apiConfig.trackButtonClicks ?? defaultConfig.trackButtonClicks,
         trackCopy: apiConfig.trackCopy ?? defaultConfig.trackCopy,
         trackFormInteractions: apiConfig.trackFormInteractions ?? defaultConfig.trackFormInteractions,
+        identityResolutionEnabled:
+          apiConfig.identityResolution?.enabled === true &&
+          scriptTag.getAttribute("data-identity-resolution") !== "false",
+        identityPolicyVersion: apiConfig.identityResolution?.policyVersion ?? defaultConfig.identityPolicyVersion,
+        identityConnectorUrl: apiConfig.identityResolution?.connectorUrl ?? null,
       };
     } else {
       // If API call fails, log warning and use defaults
