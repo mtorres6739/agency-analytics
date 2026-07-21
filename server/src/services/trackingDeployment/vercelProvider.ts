@@ -337,6 +337,60 @@ function trackerCspCompatible(policy: string | null, analyticsOrigin: string) {
   );
 }
 
+function addOriginToCspDirective(policy: string, directiveName: "script-src" | "connect-src", origin: string) {
+  if (cspAllowsOrigin(policy, directiveName, origin)) return policy;
+
+  const trailingSemicolon = policy.trimEnd().endsWith(";");
+  const directives = policy
+    .split(";")
+    .map(value => value.trim())
+    .filter(Boolean);
+  const directiveIndex = directives.findIndex(value => value.split(/\s+/, 1)[0]?.toLowerCase() === directiveName);
+
+  if (directiveIndex >= 0) {
+    directives[directiveIndex] = `${directives[directiveIndex]} ${origin}`;
+  } else {
+    const defaultDirective = directives.find(value => value.split(/\s+/, 1)[0]?.toLowerCase() === "default-src");
+    const inheritedSources = defaultDirective?.replace(/^default-src\s*/i, "").trim();
+    directives.push(`${directiveName}${inheritedSources ? ` ${inheritedSources}` : ""} ${origin}`);
+  }
+
+  return `${directives.join("; ")}${trailingSemicolon ? ";" : ""}`;
+}
+
+function getVercelJsonCspPolicies(source: string) {
+  const config = JSON.parse(source) as {
+    headers?: Array<{ headers?: Array<{ key?: unknown; value?: unknown }> }>;
+  };
+  return (config.headers ?? []).flatMap(rule =>
+    (rule.headers ?? [])
+      .filter(header => String(header.key ?? "").toLowerCase() === "content-security-policy")
+      .map(header => String(header.value ?? ""))
+  );
+}
+
+function vercelJsonCspCompatible(source: string, analyticsOrigin: string) {
+  const policies = getVercelJsonCspPolicies(source);
+  return policies.length > 0 && policies.every(policy => trackerCspCompatible(policy, analyticsOrigin));
+}
+
+export function buildVercelJsonCspAllowance(source: string, analyticsOrigin: string) {
+  // Validate the complete file before applying a minimal textual change. Keeping
+  // the original formatting makes installer pull requests reviewable.
+  const policies = getVercelJsonCspPolicies(source);
+  if (policies.length === 0) return source;
+
+  const headerPattern = /("key"\s*:\s*"content-security-policy"\s*,\s*"value"\s*:\s*)("(?:\\.|[^"\\])*")/gi;
+  const desired = source.replace(headerPattern, (_match, prefix: string, encodedPolicy: string) => {
+    const policy = JSON.parse(encodedPolicy) as string;
+    const withScript = addOriginToCspDirective(policy, "script-src", analyticsOrigin);
+    const withConnect = addOriginToCspDirective(withScript, "connect-src", analyticsOrigin);
+    return `${prefix}${JSON.stringify(withConnect)}`;
+  });
+
+  return vercelJsonCspCompatible(desired, analyticsOrigin) ? desired : source;
+}
+
 export class VercelTrackingProvider {
   private vercel: VercelClient;
   private github: GitHubClient;
@@ -430,6 +484,23 @@ export class VercelTrackingProvider {
     const policy = homepage?.headers.get("content-security-policy") ?? null;
     let cspCompatible = trackerCspCompatible(policy, this.config.analyticsOrigin);
     const additionalFiles: ManagedFile[] = [];
+    if (!cspCompatible) {
+      const configPath = joinPath(root, "vercel.json");
+      const configFile = await this.github.getContent(owner, repo, configPath, base);
+      if (configFile?.content) {
+        const baseContent = decodeContent(configFile);
+        const desiredConfig = buildVercelJsonCspAllowance(baseContent, this.config.analyticsOrigin);
+        if (desiredConfig !== baseContent && vercelJsonCspCompatible(desiredConfig, this.config.analyticsOrigin)) {
+          additionalFiles.push({
+            filePath: configPath,
+            desired: desiredConfig,
+            baseContent,
+            existingSha: configFile.sha,
+          });
+          cspCompatible = true;
+        }
+      }
+    }
     if (!cspCompatible && project.framework === "nextjs") {
       for (const candidate of ["next.config.ts", "next.config.mjs", "next.config.js"]) {
         const configPath = joinPath(root, candidate);
@@ -438,6 +509,7 @@ export class VercelTrackingProvider {
         const baseContent = decodeContent(configFile);
         const desiredConfig = buildNextConfigCspAllowance(baseContent, this.config.analyticsOrigin);
         if (
+          desiredConfig !== baseContent &&
           directiveContainsOrigin(desiredConfig, "script-src", this.config.analyticsOrigin) &&
           directiveContainsOrigin(desiredConfig, "connect-src", this.config.analyticsOrigin)
         ) {
