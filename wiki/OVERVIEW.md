@@ -72,6 +72,8 @@ The first Vite automatic-install pilot is live on `arizonatattooremoval.com` as 
 
 Verified identity uses short-lived signed assertions created only by a website backend after confirmed lead delivery. Per-site secrets are encrypted in Postgres, deployed to Vercel as server-only variables, and activated only after the replacement production deployment is ready. Public/private-link user routes are disabled; identified profile reads require authenticated site access. Palm Squad is the first eligible GHL adapter. Accident Doctor, Neuron Connect, Arizona Tattoo Removal, and R2 Law are enforced compliance blocks; Cummings Pest is blocked by its simulated delivery path.
 
+Palm Squad verified identity went live on 2026-07-21 with active key version 2. The first provisioning attempt failed closed and left key version 1 revoked when Vercel's deployment list returned `uid` instead of `id`; the provider now accepts both shapes and has a matching regression test. Palm uses the versioned tracker URL `script.js?v=verified-identity-v1` so Cloudflare's four-hour cache cannot retain the pre-identity script. Production release `cd34a5717e7636de706208712a7f4e0e28b58fee` passed the immutable-image workflow and Hetzner health-checked deployment. No synthetic production lead was submitted; the first real GHL-delivered lead is the live identification acceptance event.
+
 A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocks DNS-only Vercel domains; those projects use the Vercel/GitHub preview-PR adapter instead.
 
 ## Knowledge rule
