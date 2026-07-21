@@ -70,6 +70,8 @@ The pilot also validated the complete agency workflow: controlled client creatio
 
 The first Vite automatic-install pilot is live on `arizonatattooremoval.com` as Rybbit site `3` with public tracker property ID `c31cb16ba8c1`. The installer detected the Vercel/GitHub project, added an idempotent managed script to the root `index.html`, waited for a ready preview, squash-merged Arizona Tattoo Removal PR `#3`, and verified the canonical production pageview in ClickHouse on 2026-07-20.
 
+Verified identity uses short-lived signed assertions created only by a website backend after confirmed lead delivery. Per-site secrets are encrypted in Postgres, deployed to Vercel as server-only variables, and activated only after the replacement production deployment is ready. Public/private-link user routes are disabled; identified profile reads require authenticated site access. Palm Squad is the first eligible GHL adapter. Accident Doctor, Neuron Connect, Arizona Tattoo Removal, and R2 Law are enforced compliance blocks; Cummings Pest is blocked by its simulated delivery path.
+
 A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocks DNS-only Vercel domains; those projects use the Vercel/GitHub preview-PR adapter instead.
 
 ## Knowledge rule

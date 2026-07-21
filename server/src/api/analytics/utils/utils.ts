@@ -173,30 +173,56 @@ export const bucketIntervalMap = {
 export async function enrichWithTraits<T extends { identified_user_id: string }>(
   data: T[],
   siteId: number
-): Promise<Array<T & { traits: Record<string, unknown> | null }>> {
+): Promise<
+  Array<
+    T & {
+      traits: Record<string, unknown> | null;
+      identity_source: string | null;
+      last_identified_at: string | null;
+    }
+  >
+> {
   const identifiedUserIds = [
     ...new Set(data.filter(item => item.identified_user_id).map(item => item.identified_user_id)),
   ];
 
-  let traitsMap: Map<string, Record<string, unknown>> = new Map();
+  let profileMap: Map<
+    string,
+    { traits: Record<string, unknown>; identity_source: string | null; last_identified_at: string | null }
+  > = new Map();
   if (identifiedUserIds.length > 0) {
     const profiles = await db
       .select({
         userId: userProfiles.userId,
         traits: userProfiles.traits,
+        identitySource: userProfiles.identitySource,
+        lastIdentifiedAt: userProfiles.lastIdentifiedAt,
       })
       .from(userProfiles)
       .where(and(eq(userProfiles.siteId, siteId), inArray(userProfiles.userId, identifiedUserIds)));
 
-    traitsMap = new Map(
+    profileMap = new Map(
       profiles.map(p => [
         p.userId,
-        p.traits && typeof p.traits === "object" && !Array.isArray(p.traits)
-          ? (p.traits as Record<string, unknown>)
-          : {},
+        {
+          traits:
+            p.traits && typeof p.traits === "object" && !Array.isArray(p.traits)
+              ? (p.traits as Record<string, unknown>)
+              : {},
+          identity_source: p.identitySource,
+          last_identified_at: p.lastIdentifiedAt,
+        },
       ])
     );
   }
 
-  return data.map(item => ({ ...item, traits: traitsMap.get(item.identified_user_id) || null }));
+  return data.map(item => {
+    const profile = profileMap.get(item.identified_user_id);
+    return {
+      ...item,
+      traits: profile?.traits ?? null,
+      identity_source: profile?.identity_source ?? null,
+      last_identified_at: profile?.last_identified_at ?? null,
+    };
+  });
 }

@@ -76,7 +76,7 @@ export function IdentifyUserDialog({ anonymousId, open, onOpenChange }: Identify
               required
             />
             <p className="text-xs text-muted-foreground">
-              {t("The ID this person has in your own system, like an email or account ID.")}
+              {t("Use an opaque internal ID. Never use an email address, phone number, or CRM contact ID.")}
             </p>
           </div>
           <div className="space-y-1.5">

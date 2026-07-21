@@ -112,7 +112,7 @@ export function UsersTable() {
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   useEffect(() => {
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
   }, [debouncedSearch]);
 
   const effectiveIdentifiedOnly = identifiedOnly || debouncedSearch.length > 0;
@@ -130,6 +130,9 @@ export function UsersTable() {
     search: debouncedSearch,
     searchField,
   });
+
+  const pageHasTrait = (key: "company" | "plan") =>
+    (data?.data ?? []).some(user => typeof user.traits?.[key] === "string" && String(user.traits[key]).trim());
 
   const columns = [
     columnHelper.accessor("user_id", {
@@ -149,10 +152,95 @@ export function UsersTable() {
               {displayName}
             </span>
             {isIdentified && <IdentifiedBadge traits={info.row.original.traits} userId={identifiedUserId} />}
+            {!isIdentified && (
+              <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                {t("Anonymous")}
+              </span>
+            )}
           </Link>
         );
       },
     }),
+    columnHelper.display({
+      id: "name",
+      header: t("Name"),
+      cell: info => {
+        const name = info.row.original.traits?.name ?? info.row.original.traits?.username;
+        return name ? (
+          <span className="block max-w-44 truncate" title={String(name)}>
+            {String(name)}
+          </span>
+        ) : info.row.original.identified_user_id ? (
+          <span className="text-neutral-400">—</span>
+        ) : (
+          <span className="text-neutral-500 dark:text-neutral-400">{t("Anonymous")}</span>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: "email",
+      header: t("Email"),
+      cell: info => {
+        const email = info.row.original.traits?.email;
+        return email ? (
+          <span className="block max-w-56 truncate" title={String(email)}>
+            {String(email)}
+          </span>
+        ) : (
+          <span className="text-neutral-400">—</span>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: "identity_source",
+      header: t("Source"),
+      cell: info =>
+        info.row.original.identity_source === "verified" ? (
+          <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            {t("Verified lead")}
+          </span>
+        ) : info.row.original.identified_user_id ? (
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">{t("Direct")}</span>
+        ) : (
+          <span className="text-neutral-400">—</span>
+        ),
+    }),
+    ...(pageHasTrait("company")
+      ? [
+          columnHelper.display({
+            id: "company",
+            header: t("Company"),
+            cell: info => {
+              const company = info.row.original.traits?.company;
+              return company ? (
+                <span className="block max-w-40 truncate" title={String(company)}>
+                  {String(company)}
+                </span>
+              ) : (
+                "—"
+              );
+            },
+          }),
+        ]
+      : []),
+    ...(pageHasTrait("plan")
+      ? [
+          columnHelper.display({
+            id: "plan",
+            header: t("Plan"),
+            cell: info => {
+              const plan = info.row.original.traits?.plan;
+              return plan ? (
+                <span className="block max-w-32 truncate" title={String(plan)}>
+                  {String(plan)}
+                </span>
+              ) : (
+                "—"
+              );
+            },
+          }),
+        ]
+      : []),
     columnHelper.accessor("country", {
       header: t("Country"),
       cell: info => {
@@ -320,7 +408,7 @@ export function UsersTable() {
             className="rounded-l-none"
             type="search"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-2">
@@ -380,10 +468,7 @@ export function UsersTable() {
               ))
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-3 py-8 text-center text-neutral-500 dark:text-neutral-400"
-                >
+                <td colSpan={columns.length} className="px-3 py-8 text-center text-neutral-500 dark:text-neutral-400">
                   {t("No users found")}
                 </td>
               </tr>
@@ -393,11 +478,16 @@ export function UsersTable() {
                 const href = `/${site}/user/${encodeURIComponent(linkId)}`;
 
                 return (
-                  <tr key={row.id} className="border-b border-neutral-100 dark:border-neutral-800 group hover:bg-neutral-50 dark:hover:bg-neutral-850">
+                  <tr
+                    key={row.id}
+                    className="border-b border-neutral-100 dark:border-neutral-800 group hover:bg-neutral-50 dark:hover:bg-neutral-850"
+                  >
                     {row.getVisibleCells().map(cell => (
                       <td
                         key={cell.id}
-                        className={isTimeColumn(cell.column.id) ? `p-3 relative ${TIME_COLUMN_WIDTH_CLASS}` : "p-3 relative"}
+                        className={
+                          isTimeColumn(cell.column.id) ? `p-3 relative ${TIME_COLUMN_WIDTH_CLASS}` : "p-3 relative"
+                        }
                       >
                         {/* <Link
                             href={href}

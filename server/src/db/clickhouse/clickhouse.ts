@@ -140,6 +140,7 @@ export const initializeClickhouse = async () => {
       ENGINE = MergeTree()
       PARTITION BY toYYYYMM(timestamp)
       ORDER BY (site_id, timestamp)
+      TTL timestamp + INTERVAL 13 MONTH
       `
   );
 
@@ -147,6 +148,10 @@ export const initializeClickhouse = async () => {
   // TABLE above was missing these columns). Only columns that are actually
   // missing are altered in — even a no-op ALTER needs the events table ALTER lock.
   await ensureEventsColumns();
+  await execClickhouseInitStep(
+    "enforce analytics retention",
+    "ALTER TABLE events MODIFY TTL timestamp + INTERVAL 13 MONTH"
+  );
 
   await execClickhouseInitStep(
     "create bot events table",
@@ -211,7 +216,7 @@ export const initializeClickhouse = async () => {
       ENGINE = MergeTree()
       PARTITION BY toYYYYMM(timestamp)
       ORDER BY (site_id, session_id, sequence_number)
-      TTL toDateTime(timestamp) + INTERVAL 30 DAY
+      TTL toDateTime(timestamp) + INTERVAL 14 DAY
       `,
   });
 
@@ -221,7 +226,10 @@ export const initializeClickhouse = async () => {
         ADD COLUMN IF NOT EXISTS event_data_key Nullable(String), -- R2 storage key for cloud deployments
         ADD COLUMN IF NOT EXISTS batch_index Nullable(UInt16), -- Index within the R2 batch
         ADD COLUMN IF NOT EXISTS identified_user_id String DEFAULT ''
-      `,
+    `,
+  });
+  await clickhouse.exec({
+    query: "ALTER TABLE session_replay_events MODIFY TTL toDateTime(timestamp) + INTERVAL 14 DAY",
   });
 
   await clickhouse.exec({
@@ -258,7 +266,7 @@ export const initializeClickhouse = async () => {
       ENGINE = ReplacingMergeTree(created_at)
       PARTITION BY toYYYYMM(start_time)
       ORDER BY (site_id, session_id)
-      TTL start_time + INTERVAL 30 DAY
+      TTL start_time + INTERVAL 14 DAY
       `,
   });
 
@@ -268,6 +276,7 @@ export const initializeClickhouse = async () => {
         ADD COLUMN IF NOT EXISTS identified_user_id String DEFAULT ''
       `,
   });
+  await clickhouse.exec({ query: "ALTER TABLE session_replay_metadata MODIFY TTL start_time + INTERVAL 14 DAY" });
 
   // Create uptime monitor events table
   await clickhouse.exec({

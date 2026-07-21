@@ -4,15 +4,26 @@ import { z } from "zod";
 import { db } from "../../../db/postgres/postgres.js";
 import { userAliases, userProfiles } from "../../../db/postgres/schema.js";
 import { backfillIdentifiedUserId } from "../../../services/tracker/identifyService.js";
+import { auditSiteIdentityEvent } from "../../../services/identity/identityAuditService.js";
 
 // Max traits size in bytes (2KB) — matches the tracker identify endpoint
 const MAX_TRAITS_SIZE = 2048;
 
 const identifyUserBodySchema = z.object({
   anonymous_id: z.string().min(1).max(255),
-  user_id: z.string().min(1).max(255),
+  user_id: z
+    .string()
+    .min(1)
+    .max(255)
+    .refine(value => !value.includes("@"), "User ID must be opaque, not an email"),
   traits: z
-    .record(z.unknown())
+    .object({
+      name: z.string().trim().min(1).max(255).optional(),
+      email: z.string().trim().toLowerCase().email().max(320).optional(),
+      company: z.string().trim().min(1).max(255).optional(),
+      plan: z.string().trim().min(1).max(100).optional(),
+    })
+    .strict()
     .optional()
     .refine(
       traits => {
@@ -55,17 +66,33 @@ export async function identifyUser(req: FastifyRequest<IdentifyUserRequest>, res
     if (Object.keys(filteredTraits).length > 0) {
       await db
         .insert(userProfiles)
-        .values({ siteId, userId: user_id, traits: filteredTraits })
+        .values({
+          siteId,
+          userId: user_id,
+          traits: filteredTraits,
+          identitySource: "dashboard",
+          lastIdentifiedAt: new Date().toISOString(),
+        })
         .onConflictDoUpdate({
           target: [userProfiles.siteId, userProfiles.userId],
           set: {
             traits: sql`${userProfiles.traits} || ${JSON.stringify(filteredTraits)}::jsonb`,
+            identitySource: "dashboard",
+            lastIdentifiedAt: sql`now()`,
             updatedAt: sql`now()`,
           },
         });
     } else {
       // Profile shell so the user shows up in search/inventory even without traits
-      await db.insert(userProfiles).values({ siteId, userId: user_id }).onConflictDoNothing();
+      await db
+        .insert(userProfiles)
+        .values({
+          siteId,
+          userId: user_id,
+          identitySource: "dashboard",
+          lastIdentifiedAt: new Date().toISOString(),
+        })
+        .onConflictDoNothing();
     }
 
     await db
@@ -80,6 +107,13 @@ export async function identifyUser(req: FastifyRequest<IdentifyUserRequest>, res
     // so don't hold the response on it. No backfill window — the operator is
     // explicitly asserting this device's history belongs to this user.
     backfillIdentifiedUserId(siteId, anonymous_id, user_id, null);
+    await auditSiteIdentityEvent({
+      siteId,
+      actorUserId: req.user?.id ?? null,
+      action: "identified_user.created_manually",
+      targetId: user_id,
+      metadata: { traitKeys: Object.keys(filteredTraits) },
+    });
 
     return res.send({ success: true });
   } catch (error) {

@@ -154,8 +154,11 @@ import {
   getSitePrivateLinkConfig,
   getSitesFromOrg,
   getTrackingConfig,
+  getSiteIdentitySettings,
   moveSite,
+  rotateSiteIdentityKey,
   updateSiteConfig,
+  updateSiteIdentitySettings,
   updateSitePrivateLinkConfig,
 } from "./api/sites/index.js";
 import {
@@ -203,6 +206,8 @@ import { IS_CLOUD } from "./lib/const.js";
 import { reengagementService } from "./services/reengagement/reengagementService.js";
 import { telemetryService } from "./services/telemetryService.js";
 import { handleIdentify } from "./services/tracker/identifyService.js";
+import { handleVerifiedIdentify } from "./services/identity/verifiedIdentifyService.js";
+import { identityRetentionService } from "./services/identity/identityRetentionService.js";
 import { trackEvent } from "./services/tracker/trackEvent.js";
 import { usageService } from "./services/usageService.js";
 import { weeklyReportService } from "./services/weekyReports/weeklyReportService.js";
@@ -247,7 +252,10 @@ const authOnlyScoped = (resource: ScopeResource, action: ScopeAction) => ({
 const publicAnalyticsRead = publicSiteScoped("analytics", "read");
 const publicSessionsRead = publicSiteScoped("sessions", "read");
 const publicEventsRead = publicSiteScoped("events", "read");
-const publicUsersRead = publicSiteScoped("users", "read");
+// Identified-user surfaces can contain names and email addresses. They always
+// require an authenticated, site-authorized session; public/private links do
+// not inherit access to profile data.
+const authUsersRead = authSiteScoped("users", "read");
 const publicFunnelsRead = publicSiteScoped("funnels", "read");
 const publicGoalsRead = publicSiteScoped("goals", "read");
 const publicSitesRead = publicSiteScoped("sites", "read");
@@ -408,16 +416,16 @@ async function analyticsRoutes(fastify: FastifyInstance) {
   fastify.get("/sites/:siteId/events", publicEventsRead, getEvents);
   fastify.get("/sites/:siteId/events/time-series", publicEventsRead, getEventBucketed);
   fastify.get("/sites/:siteId/events/count", publicEventsRead, getSiteEventCount);
-  fastify.get("/sites/:siteId/users", publicUsersRead, getUsers);
+  fastify.get("/sites/:siteId/users", authUsersRead, getUsers);
 
-  fastify.get("/sites/:siteId/users/session-count", publicUsersRead, getUserSessionCount);
-  fastify.get("/sites/:siteId/users/:userId", publicUsersRead, getUserInfo);
+  fastify.get("/sites/:siteId/users/session-count", authUsersRead, getUserSessionCount);
+  fastify.get("/sites/:siteId/users/:userId", authUsersRead, getUserInfo);
   fastify.post("/sites/:siteId/users/identify", authUsersWrite, identifyUser);
   fastify.put("/sites/:siteId/users/:userId/traits", authUsersWrite, updateUserTraits);
   fastify.delete("/sites/:siteId/users/:userId", adminUsersWrite, deleteUser);
-  fastify.get("/sites/:siteId/user-traits/keys", publicUsersRead, getUserTraitKeys);
-  fastify.get("/sites/:siteId/user-traits/values", publicUsersRead, getUserTraitValues);
-  fastify.get("/sites/:siteId/user-traits/users", publicUsersRead, getUserTraitValueUsers);
+  fastify.get("/sites/:siteId/user-traits/keys", authUsersRead, getUserTraitKeys);
+  fastify.get("/sites/:siteId/user-traits/values", authUsersRead, getUserTraitValues);
+  fastify.get("/sites/:siteId/user-traits/users", authUsersRead, getUserTraitValueUsers);
   fastify.get("/sites/:siteId/sessions/locations", publicSessionsRead, getSessionLocations);
   fastify.get("/sites/:siteId/funnels", publicFunnelsRead, getFunnels);
   fastify.get("/sites/:siteId/journeys", publicAnalyticsRead, getJourneys);
@@ -477,6 +485,9 @@ async function sitesRoutes(fastify: FastifyInstance) {
   // Sites
   fastify.get("/sites/:siteId", publicSitesRead, getSite);
   fastify.put("/sites/:siteId/config", adminSitesWrite, updateSiteConfig);
+  fastify.get("/sites/:siteId/identity-settings", authSitesRead, getSiteIdentitySettings);
+  fastify.patch("/sites/:siteId/identity-settings", adminSitesWrite, updateSiteIdentitySettings);
+  fastify.post("/sites/:siteId/identity-keys/rotate", adminSitesWrite, rotateSiteIdentityKey);
   fastify.put("/sites/:siteId/move", adminSitesWrite, moveSite);
   fastify.delete("/sites/:siteId", adminSitesWrite, deleteSite);
   fastify.get("/sites/:siteId/private-link-config", adminSitesWrite, getSitePrivateLinkConfig);
@@ -671,6 +682,7 @@ async function apiRoutes(fastify: FastifyInstance) {
 
 server.post("/api/track", trackEvent);
 server.post("/api/identify", handleIdentify);
+server.post("/api/identify/verified", handleVerifiedIdentify);
 
 // Register API routes with /api prefix
 server.register(apiRoutes, { prefix: "/api" });
@@ -688,6 +700,7 @@ const start = async () => {
       usageService.startUsageCheckCron();
       await agencyReportService.initialize();
       await trackingDeploymentService.initialize();
+      identityRetentionService.start();
       if (IS_CLOUD && process.env.NODE_ENV !== "development") {
         weeklyReportService.startWeeklyReportCron();
         reengagementService.startReengagementCron();

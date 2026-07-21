@@ -98,6 +98,11 @@ export function UserHeader({ userId, displayName, data, isLoading }: UserHeaderP
                   {displayName}
                 </h1>
                 {isIdentified && <IdentifiedBadge traits={data?.traits} userId={data?.identified_user_id} />}
+                {data?.identity_source === "verified" && (
+                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                    {t("Verified lead")}
+                  </span>
+                )}
               </div>
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
                 {isOnline ? (

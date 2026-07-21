@@ -36,6 +36,8 @@ As of 2026-07-19, `npm audit --omit=dev` reports zero production advisories for 
 - Onboarding requires excluded IP, country, path, hostname, and replay masking review.
 - Do not send form fields, email addresses, phone numbers, names, or query-string PII as analytics properties.
 - Client legal owners decide whether base analytics or optional replay/identify requires consent in their jurisdiction.
+- Verified lead identification occurs only after the website backend confirms real CRM delivery. Assertions contain an opaque user ID plus the allowlisted profile fields; phone, message, symptoms, service, appointment, address, legal details, provider payloads, and free text are rejected or never passed to the helper.
+- Medical domains and R2 Law are hard-blocked in the server compliance policy. Key creation and enablement return `COMPLIANCE_BLOCKED` until a reviewed release changes that policy.
 
 ## Retention
 
@@ -45,6 +47,7 @@ As of 2026-07-19, `npm audit --omit=dev` reports zero production advisories for 
 - Report artifacts: 90 days.
 - Audit events: 24 months.
 - Backup sets: 30 daily and 12 monthly restore points.
+- The daily identity-retention job removes expired Postgres profiles and aliases using each site's configured retention. ClickHouse enforces the 13-month event TTL and 14-day replay TTL.
 
 ## Application controls
 

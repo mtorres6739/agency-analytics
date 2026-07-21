@@ -138,6 +138,7 @@ export interface RybbitAPI {
   error: (error: Error, properties?: ErrorProperties) => void;
   trackOutbound: (url: string, text?: string, target?: string) => void;
   identify: (userId: string, traits?: Record<string, unknown>) => void;
+  identifyVerified: (assertion: string) => Promise<boolean>;
   setTraits: (traits: Record<string, unknown>) => void;
   clearUserId: () => void;
   getUserId: () => string | null;

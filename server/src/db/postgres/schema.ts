@@ -1027,6 +1027,8 @@ export const userProfiles = pgTable(
       .references(() => sites.siteId, { onDelete: "cascade" }),
     userId: text("user_id").notNull(), // The identified user ID from identify() call
     traits: jsonb("traits").$type<Record<string, unknown>>().default({}),
+    identitySource: text("identity_source"),
+    lastIdentifiedAt: timestamp("last_identified_at", { mode: "string" }),
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
   },
@@ -1049,6 +1051,62 @@ export const userAliases = pgTable(
     unique("user_aliases_site_anon_unique").on(table.siteId, table.anonymousId),
     index("user_aliases_user_idx").on(table.siteId, table.userId),
     index("user_aliases_anon_idx").on(table.siteId, table.anonymousId),
+  ]
+);
+
+// Per-site controls for verified user identification. Identity is deliberately
+// disabled unless an owner/admin enables it after the site's privacy review.
+export const siteIdentitySettings = pgTable(
+  "site_identity_settings",
+  {
+    siteId: integer("site_id")
+      .primaryKey()
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(false),
+    mode: text("mode").notNull().default("signed"),
+    allowedTraits: jsonb("allowed_traits").$type<string[]>().notNull().default(["name", "email", "company", "plan"]),
+    retentionDays: integer("retention_days").notNull().default(395),
+    activeKeyId: text("active_key_id"),
+    lastSuccessAt: timestamp("last_success_at", { mode: "string" }),
+    lastFailureAt: timestamp("last_failure_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    check("site_identity_settings_mode_check", sql`${table.mode} IN ('signed', 'direct')`),
+    check("site_identity_settings_retention_check", sql`${table.retentionDays} BETWEEN 1 AND 3650`),
+  ]
+);
+
+// Secrets are encrypted with IDENTITY_KEY_ENCRYPTION_SECRET before storage.
+// Multiple versions allow rotation without invalidating an in-flight assertion.
+export const siteIdentityKeys = pgTable(
+  "site_identity_keys",
+  {
+    id: text("id").primaryKey().notNull(),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    encryptedSecret: text("encrypted_secret").notNull(),
+    initializationVector: text("initialization_vector").notNull(),
+    authTag: text("auth_tag").notNull(),
+    status: text("status").notNull().default("pending"),
+    deploymentProvider: text("deployment_provider"),
+    deploymentProject: text("deployment_project"),
+    deploymentId: text("deployment_id"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    deployedAt: timestamp("deployed_at", { mode: "string" }),
+    retiredAt: timestamp("retired_at", { mode: "string" }),
+    revokedAt: timestamp("revoked_at", { mode: "string" }),
+    lastUsedAt: timestamp("last_used_at", { mode: "string" }),
+  },
+  table => [
+    unique("site_identity_keys_site_version_unique").on(table.siteId, table.version),
+    index("site_identity_keys_site_status_idx").on(table.siteId, table.status),
+    check("site_identity_keys_status_check", sql`${table.status} IN ('pending', 'active', 'retired', 'revoked')`),
+    check("site_identity_keys_version_check", sql`${table.version} > 0`),
   ]
 );
 

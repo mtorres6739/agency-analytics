@@ -5,3 +5,4 @@ export * from "./scopes";
 export * from "./time";
 export * from "./performance";
 export * from "./agency";
+export * from "./identity";

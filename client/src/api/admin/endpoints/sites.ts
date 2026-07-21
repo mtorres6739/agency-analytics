@@ -1,4 +1,5 @@
 import { authedFetch } from "../../utils";
+import type { IdentitySettings, IdentityTraitKey } from "@rybbit/shared";
 
 export type SiteResponse = {
   id: string | null;
@@ -177,6 +178,34 @@ export function updateSiteConfig(
 export function fetchSite(siteId: string | number) {
   return authedFetch<SiteResponse>(`/sites/${siteId}`);
 }
+
+export function fetchIdentitySettings(siteId: string | number) {
+  return authedFetch<{ settings: IdentitySettings }>(`/sites/${siteId}/identity-settings`);
+}
+
+export function updateIdentitySettings(
+  siteId: string | number,
+  input: Partial<Pick<IdentitySettings, "enabled" | "mode" | "allowedTraits" | "retentionDays">>
+) {
+  return authedFetch<{ settings: IdentitySettings }>(`/sites/${siteId}/identity-settings`, undefined, {
+    method: "PATCH",
+    data: input,
+  });
+}
+
+export function rotateIdentityKey(siteId: string | number) {
+  return authedFetch<{
+    keyVersion: number;
+    keyConfigured: boolean;
+    rotationStatus: "pending";
+    provider: "vercel";
+    project: string;
+  }>(`/sites/${siteId}/identity-keys/rotate`, undefined, {
+    method: "POST",
+  });
+}
+
+export type { IdentitySettings, IdentityTraitKey };
 
 export type SiteUsageResponse = {
   periodStart: string;

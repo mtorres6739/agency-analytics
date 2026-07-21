@@ -59,4 +59,12 @@ Exit: idempotent weekly/monthly reports deliver above 99% after retries.
 
 ## Post-v1
 
-Replay consent, errors, users, retention, funnels, journeys, advanced events, GA4 import, Slack, Command Center integration, client managers, and per-client domains.
+Replay consent, errors, retention, funnels, journeys, advanced events, GA4 import, Slack, Command Center integration, client managers, and per-client domains.
+
+## Identified users rollout
+
+- [x] Signed assertions, encrypted per-site keys, Vercel environment provisioning, production redeploy status, replay protection, kill switch, retention, authenticated Users UI, and audit events.
+- [x] Palm Squad GHL adapter and browser handoff; enable after the analytics release and Vercel preview pass.
+- [ ] Cummings Pest: replace simulated success with real CRM delivery before adding an adapter.
+- [ ] R2 Law: add delivery, remove remaining PII logs, and obtain attorney-privacy approval. Server policy blocks enablement.
+- [ ] Accident Doctor, Neuron Connect, and Arizona Tattoo Removal: adapter work remains disabled behind medical/health compliance approval. Server policy blocks key creation and enablement.

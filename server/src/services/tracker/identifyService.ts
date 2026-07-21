@@ -8,6 +8,8 @@ import { siteConfig } from "../../lib/siteConfig.js";
 import { userIdService } from "../userId/userIdService.js";
 import { resolveClientIp } from "./resolveClientIp.js";
 import { createServiceLogger } from "../../lib/logger/logger.js";
+import { getIdentitySettingsRecord } from "../identity/identitySettingsService.js";
+import { IdentityCryptoError, normalizeIdentityTraits } from "../identity/identityCrypto.js";
 
 const logger = createServiceLogger("identify-service");
 
@@ -71,6 +73,61 @@ export async function backfillIdentifiedUserId(
   }
 }
 
+export async function persistIdentifiedUser(input: {
+  siteId: number;
+  anonymousId: string;
+  userId: string;
+  traits?: Record<string, unknown>;
+  isNewIdentify?: boolean;
+  identitySource?: "direct" | "verified" | "dashboard";
+}) {
+  const { siteId, anonymousId, userId, traits, isNewIdentify = true, identitySource = "direct" } = input;
+  const identifiedAt = new Date().toISOString();
+  if (isNewIdentify) {
+    await db
+      .insert(userProfiles)
+      .values({ siteId, userId, identitySource, lastIdentifiedAt: identifiedAt })
+      .onConflictDoUpdate({
+        target: [userProfiles.siteId, userProfiles.userId],
+        set: { identitySource, lastIdentifiedAt: identifiedAt, updatedAt: sql`now()` },
+      });
+    const [existingAlias] = await db
+      .select()
+      .from(userAliases)
+      .where(and(eq(userAliases.siteId, siteId), eq(userAliases.anonymousId, anonymousId)))
+      .limit(1);
+
+    if (!existingAlias) {
+      await db.insert(userAliases).values({ siteId, anonymousId, userId }).onConflictDoNothing();
+      void backfillIdentifiedUserId(siteId, anonymousId, userId);
+    } else if (existingAlias.userId !== userId) {
+      await db
+        .update(userAliases)
+        .set({ userId })
+        .where(and(eq(userAliases.siteId, siteId), eq(userAliases.anonymousId, anonymousId)));
+    }
+  }
+
+  if (traits && Object.keys(traits).length > 0) {
+    const filteredTraits = Object.fromEntries(Object.entries(traits).filter(([, value]) => value !== null));
+    const nullKeys = Object.entries(traits)
+      .filter(([, value]) => value === null)
+      .map(([key]) => key);
+    const traitsExpr =
+      nullKeys.length > 0
+        ? sql`(${userProfiles.traits} - ${nullKeys}::text[]) || ${JSON.stringify(filteredTraits)}::jsonb`
+        : sql`${userProfiles.traits} || ${JSON.stringify(filteredTraits)}::jsonb`;
+
+    await db
+      .insert(userProfiles)
+      .values({ siteId, userId, traits: filteredTraits, identitySource, lastIdentifiedAt: identifiedAt })
+      .onConflictDoUpdate({
+        target: [userProfiles.siteId, userProfiles.userId],
+        set: { traits: traitsExpr, identitySource, lastIdentifiedAt: identifiedAt, updatedAt: sql`now()` },
+      });
+  }
+}
+
 export async function handleIdentify(request: FastifyRequest, reply: FastifyReply) {
   try {
     const validationResult = identifyPayloadSchema.safeParse(request.body);
@@ -95,6 +152,14 @@ export async function handleIdentify(request: FastifyRequest, reply: FastifyRepl
     }
 
     const siteId = siteConfiguration.siteId;
+    const { settings } = await getIdentitySettingsRecord(siteId);
+    if (!settings?.enabled || settings.mode !== "direct") {
+      return reply.status(403).send({
+        success: false,
+        error: "Direct identity is disabled for this site",
+        code: "IDENTITY_DISABLED",
+      });
+    }
 
     const anonymousId = anonymous_id
       ? await userIdService.generateUserIdFromClientId(anonymous_id, siteId)
@@ -104,81 +169,29 @@ export async function handleIdentify(request: FastifyRequest, reply: FastifyRepl
           siteId
         );
 
-    // Create alias if this is a new identify call (links anonymous_id to user_id)
-    if (is_new_identify) {
-      // Ensure a user_profiles row exists at identify time so the user is
-      // discoverable via search/inventory queries even when no traits are set,
-      // and so createdAt reflects identification time rather than first setTraits.
-      try {
-        await db.insert(userProfiles).values({ siteId, userId: user_id }).onConflictDoNothing();
-      } catch (error) {
-        logger.error({ siteId, userId: user_id, error }, "Error creating user profile shell");
-      }
-
-      try {
-        // Check if alias already exists
-        const existingAlias = await db
-          .select()
-          .from(userAliases)
-          .where(and(eq(userAliases.siteId, siteId), eq(userAliases.anonymousId, anonymousId)))
-          .limit(1);
-
-        if (existingAlias.length === 0) {
-          // Create new alias
-          await db.insert(userAliases).values({
-            siteId,
-            anonymousId,
-            userId: user_id,
-          });
-          // Fire-and-forget: backfill identified_user_id on past anonymous events
-          backfillIdentifiedUserId(siteId, anonymousId, user_id);
-        } else if (existingAlias[0].userId !== user_id) {
-          // Update alias to point to new user
-          await db
-            .update(userAliases)
-            .set({ userId: user_id })
-            .where(and(eq(userAliases.siteId, siteId), eq(userAliases.anonymousId, anonymousId)));
-        }
-      } catch (error) {
-        // Handle unique constraint violation gracefully (race condition)
-        logger.debug({ siteId, anonymousId, userId: user_id, error }, "Alias may already exist");
-      }
+    let allowedTraits: Record<string, unknown> | undefined;
+    if (traits) {
+      const normalized = normalizeIdentityTraits(traits);
+      const allowlist = new Set(settings.allowedTraits);
+      allowedTraits = Object.fromEntries(Object.entries(normalized).filter(([key]) => allowlist.has(key)));
     }
 
-    // Atomic upsert: merge non-null traits and remove keys explicitly set to null.
-    if (traits && Object.keys(traits).length > 0) {
-      try {
-        const filteredTraits = Object.fromEntries(Object.entries(traits).filter(([_, v]) => v !== null));
-        const nullKeys = Object.entries(traits)
-          .filter(([_, v]) => v === null)
-          .map(([k]) => k);
-
-        // When nullKeys is empty, drizzle serializes [] as `()` which is invalid
-        // Postgres array literal syntax. Skip the subtract clause in that case.
-        const traitsExpr =
-          nullKeys.length > 0
-            ? sql`(${userProfiles.traits} - ${nullKeys}::text[]) || ${JSON.stringify(filteredTraits)}::jsonb`
-            : sql`${userProfiles.traits} || ${JSON.stringify(filteredTraits)}::jsonb`;
-
-        await db
-          .insert(userProfiles)
-          .values({ siteId, userId: user_id, traits: filteredTraits })
-          .onConflictDoUpdate({
-            target: [userProfiles.siteId, userProfiles.userId],
-            set: {
-              traits: traitsExpr,
-              updatedAt: sql`now()`,
-            },
-          });
-      } catch (error) {
-        logger.error({ siteId, userId: user_id, error }, "Error updating user profile");
-      }
-    }
+    await persistIdentifiedUser({
+      siteId,
+      anonymousId,
+      userId: user_id,
+      traits: allowedTraits,
+      isNewIdentify: is_new_identify,
+      identitySource: "direct",
+    });
 
     return reply.status(200).send({
       success: true,
     });
   } catch (error) {
+    if (error instanceof IdentityCryptoError) {
+      return reply.status(400).send({ success: false, error: error.message, code: error.code });
+    }
     logger.error(error, "Error handling identify");
     return reply.status(500).send({
       success: false,
