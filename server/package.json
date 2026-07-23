@@ -44,7 +44,7 @@
     "@maxmind/geoip2-node": "6.1.0",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@mongodb-js/zstd": "^2.0.1",
-    "@react-email/components": "1.0.1",
+    "@react-email/components": "1.0.12",
     "@react-email/tailwind": "2.0.1",
     "@rybbit/shared": "file:../shared",
     "better-auth": "1.6.23",
