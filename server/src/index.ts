@@ -214,6 +214,7 @@ import {
   resolveSiteId,
 } from "./lib/auth-middleware.js";
 import { mapHeaders } from "./lib/auth-utils.js";
+import { registerAuthContentTypeParsers } from "./lib/authContentTypeParsers.js";
 import type { ScopeAction, ScopeResource } from "./lib/scopes.js";
 import { auth } from "./lib/auth.js";
 import { mcpRoutes } from "./mcp/index.js";
@@ -367,24 +368,7 @@ server.register(
     await fastify.register(fastify => {
       const authHandler = toNodeHandler(options.auth);
 
-      fastify.addContentTypeParser(
-        "application/json",
-        /* c8 ignore next 3 */
-        (_request, _payload, done) => {
-          done(null, null);
-        }
-      );
-
-      // OAuth token requests (RFC 6749) are application/x-www-form-urlencoded;
-      // pass them through untouched too or Fastify 415s before the better-auth
-      // handler can read the raw stream.
-      fastify.addContentTypeParser(
-        "application/x-www-form-urlencoded",
-        /* c8 ignore next 3 */
-        (_request, _payload, done) => {
-          done(null, null);
-        }
-      );
+      registerAuthContentTypeParsers(fastify);
 
       fastify.all("/api/auth/*", async (request, reply: any) => {
         reply.raw.setHeaders(mapHeaders(reply.getHeaders()));
