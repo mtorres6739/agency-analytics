@@ -65,7 +65,7 @@
     "psl": "^1.15.0",
     "puppeteer": "^24.34.0",
     "react": "19.2.1",
-    "react-dom": "19.2.1",
+    "react-dom": "19.2.8",
     "resend": "^4.5.1",
     "rrweb": "^2.0.0-alpha.20",
     "safe-regex2": "^5.0.0",
