@@ -33,6 +33,14 @@ export interface ScriptConfig {
   trackFormInteractions: boolean;
   tag: string;
   featureFlags: Record<string, FeatureFlagAssignment>;
+  identityResolutionEnabled?: boolean;
+  identityPolicyVersion?: string;
+  identityConnectorUrl?: string | null;
+}
+
+export interface IdentificationConsentState {
+  status: "unknown" | "granted" | "denied";
+  gpc: boolean;
 }
 
 export interface FeatureFlagAssignment {
@@ -139,6 +147,10 @@ export interface RybbitAPI {
   trackOutbound: (url: string, text?: string, target?: string) => void;
   identify: (userId: string, traits?: Record<string, unknown>) => void;
   identifyVerified: (assertion: string) => Promise<boolean>;
+  consentIdentification: () => Promise<boolean>;
+  rejectIdentification: () => Promise<boolean>;
+  withdrawIdentification: () => Promise<boolean>;
+  getIdentificationConsent: () => IdentificationConsentState;
   setTraits: (traits: Record<string, unknown>) => void;
   clearUserId: () => void;
   getUserId: () => string | null;

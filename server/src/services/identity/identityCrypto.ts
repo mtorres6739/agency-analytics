@@ -19,6 +19,9 @@ const traitsSchema = z
     email: z.string().trim().toLowerCase().email().max(320).optional(),
     company: z.string().trim().min(1).max(255).optional(),
     plan: z.string().trim().min(1).max(100).optional(),
+    title: z.string().trim().min(1).max(255).optional(),
+    linkedinUrl: z.string().trim().url().max(500).optional(),
+    location: z.string().trim().min(1).max(255).optional(),
   })
   .strict();
 
@@ -130,6 +133,176 @@ export function deriveOpaqueIdentityId(
     .update(`${normalizedSource}:${normalizedExternalId}`)
     .digest("base64url");
   return `id_${digest}`;
+}
+
+export function deriveScopedIdentityKey(sitePublicId: string, purpose: string, value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) throw new IdentityCryptoError("Identity key input is required", "INVALID_ASSERTION");
+  return createHmac("sha256", derivedKeyFromEnvironment(sitePublicId, purpose)).update(normalized).digest("base64url");
+}
+
+function derivedKeyFromEnvironment(
+  sitePublicId: string,
+  purpose: string,
+  env: NodeJS.ProcessEnv = process.env
+): Buffer {
+  const configured = env.IDENTITY_KEY_ENCRYPTION_SECRET?.trim();
+  if (!configured || configured.length < 32) {
+    throw new IdentityCryptoError(
+      "IDENTITY_KEY_ENCRYPTION_SECRET must contain at least 32 characters",
+      "CONFIGURATION_ERROR"
+    );
+  }
+  return Buffer.from(hkdfSync("sha256", Buffer.from(configured), Buffer.from(sitePublicId), Buffer.from(purpose), 32));
+}
+
+export function encryptResolutionEnvelope(
+  value: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", encryptionKey(env), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
+  return [iv, cipher.getAuthTag(), encrypted].map(part => part.toString("base64url")).join(".");
+}
+
+export function decryptResolutionEnvelope(
+  value: string,
+  env: NodeJS.ProcessEnv = process.env
+): Record<string, unknown> {
+  try {
+    const [iv, tag, encrypted, extra] = value.split(".");
+    if (!iv || !tag || !encrypted || extra) throw new Error("Malformed envelope");
+    const decipher = createDecipheriv("aes-256-gcm", encryptionKey(env), Buffer.from(iv, "base64url"));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    return JSON.parse(
+      Buffer.concat([decipher.update(Buffer.from(encrypted, "base64url")), decipher.final()]).toString("utf8")
+    ) as Record<string, unknown>;
+  } catch {
+    throw new IdentityCryptoError("Resolution context could not be decrypted", "CONFIGURATION_ERROR");
+  }
+}
+
+export function createCorrelationToken(input: {
+  sitePublicId: string;
+  anonymousSubject: string;
+  receiptId: string;
+  expiresAt: number;
+}): string {
+  const payload = encodeJson({
+    v: 1,
+    iss: input.sitePublicId,
+    sub: input.anonymousSubject,
+    receipt: input.receiptId,
+    exp: input.expiresAt,
+  });
+  const signature = createHmac("sha256", derivedKeyFromEnvironment(input.sitePublicId, "resolution-correlation-v1"))
+    .update(payload)
+    .digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyCorrelationToken(input: { token: string; expectedSitePublicId: string; nowSeconds?: number }): {
+  anonymousSubject: string;
+  receiptId: string;
+} {
+  const [payload, signature, extra] = input.token.split(".");
+  if (!payload || !signature || extra) {
+    throw new IdentityCryptoError("Correlation token is malformed", "INVALID_ASSERTION");
+  }
+  const expected = createHmac(
+    "sha256",
+    derivedKeyFromEnvironment(input.expectedSitePublicId, "resolution-correlation-v1")
+  )
+    .update(payload)
+    .digest();
+  const received = Buffer.from(signature, "base64url");
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+    throw new IdentityCryptoError("Correlation token is invalid", "INVALID_ASSERTION");
+  }
+  let claims: unknown;
+  try {
+    claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    throw new IdentityCryptoError("Correlation token is malformed", "INVALID_ASSERTION");
+  }
+  const parsed = z
+    .object({
+      v: z.literal(1),
+      iss: z.literal(input.expectedSitePublicId),
+      sub: z.string().min(1).max(255),
+      receipt: z.string().uuid(),
+      exp: z.number().int().positive(),
+    })
+    .safeParse(claims);
+  const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  if (!parsed.success) {
+    throw new IdentityCryptoError("Correlation token is invalid", "INVALID_ASSERTION");
+  }
+  if (parsed.data.exp < now) {
+    throw new IdentityCryptoError("Correlation token has expired", "EXPIRED_ASSERTION");
+  }
+  return { anonymousSubject: parsed.data.sub, receiptId: parsed.data.receipt };
+}
+
+export function createConsentWithdrawalToken(input: {
+  sitePublicId: string;
+  anonymousSubject: string;
+  receiptId: string;
+  expiresAt: number;
+}): string {
+  const payload = encodeJson({
+    v: 1,
+    iss: input.sitePublicId,
+    sub: input.anonymousSubject,
+    receipt: input.receiptId,
+    exp: input.expiresAt,
+  });
+  const signature = createHmac("sha256", derivedKeyFromEnvironment(input.sitePublicId, "consent-withdrawal-v1"))
+    .update(payload)
+    .digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyConsentWithdrawalToken(input: {
+  token: string;
+  expectedSitePublicId: string;
+  nowSeconds?: number;
+}): { anonymousSubject: string; receiptId: string } {
+  const [payload, signature, extra] = input.token.split(".");
+  if (!payload || !signature || extra) {
+    throw new IdentityCryptoError("Withdrawal token is malformed", "INVALID_ASSERTION");
+  }
+  const expected = createHmac("sha256", derivedKeyFromEnvironment(input.expectedSitePublicId, "consent-withdrawal-v1"))
+    .update(payload)
+    .digest();
+  const received = Buffer.from(signature, "base64url");
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+    throw new IdentityCryptoError("Withdrawal token is invalid", "INVALID_ASSERTION");
+  }
+  let claims: unknown;
+  try {
+    claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    throw new IdentityCryptoError("Withdrawal token is malformed", "INVALID_ASSERTION");
+  }
+  const parsed = z
+    .object({
+      v: z.literal(1),
+      iss: z.literal(input.expectedSitePublicId),
+      sub: z.string().min(1).max(255),
+      receipt: z.string().uuid(),
+      exp: z.number().int().positive(),
+    })
+    .safeParse(claims);
+  const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  if (!parsed.success) {
+    throw new IdentityCryptoError("Withdrawal token is invalid", "INVALID_ASSERTION");
+  }
+  if (parsed.data.exp < now) {
+    throw new IdentityCryptoError("Withdrawal token has expired", "EXPIRED_ASSERTION");
+  }
+  return { anonymousSubject: parsed.data.sub, receiptId: parsed.data.receipt };
 }
 
 export function createIdentityAssertion(input: {

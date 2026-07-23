@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   IdentityCryptoError,
   createIdentityAssertion,
+  createCorrelationToken,
+  createConsentWithdrawalToken,
   decryptIdentitySecret,
+  decryptResolutionEnvelope,
   deriveOpaqueIdentityId,
   encryptIdentitySecret,
+  encryptResolutionEnvelope,
   generateIdentitySecret,
   verifyIdentityAssertion,
+  verifyCorrelationToken,
+  verifyConsentWithdrawalToken,
 } from "./identityCrypto.js";
 
 const env = { IDENTITY_KEY_ENCRYPTION_SECRET: "test-only-identity-encryption-secret-123456" } as NodeJS.ProcessEnv;
@@ -95,5 +101,43 @@ describe("identity crypto", () => {
         traits: { phone: "555-555-5555" } as never,
       })
     ).toThrow("traits are invalid");
+  });
+
+  it("encrypts transient network context and verifies site-bound correlation tokens", () => {
+    const prior = process.env.IDENTITY_KEY_ENCRYPTION_SECRET;
+    process.env.IDENTITY_KEY_ENCRYPTION_SECRET = env.IDENTITY_KEY_ENCRYPTION_SECRET;
+    try {
+      const envelope = encryptResolutionEnvelope({ ipAddress: "203.0.113.10", userAgent: "test" });
+      expect(envelope).not.toContain("203.0.113.10");
+      expect(decryptResolutionEnvelope(envelope)).toEqual({ ipAddress: "203.0.113.10", userAgent: "test" });
+      const token = createCorrelationToken({
+        sitePublicId: "site_public",
+        anonymousSubject: "anon_123",
+        receiptId: "8c27c5e4-8981-41a0-a386-61f8bab1279e",
+        expiresAt: 2_000,
+      });
+      expect(
+        verifyCorrelationToken({ token, expectedSitePublicId: "site_public", nowSeconds: 1_999 })
+      ).toEqual({ anonymousSubject: "anon_123", receiptId: "8c27c5e4-8981-41a0-a386-61f8bab1279e" });
+      expect(() => verifyCorrelationToken({ token, expectedSitePublicId: "other", nowSeconds: 1_999 })).toThrow();
+      expect(() => verifyCorrelationToken({ token, expectedSitePublicId: "site_public", nowSeconds: 2_001 })).toThrow(
+        "expired"
+      );
+      const withdrawal = createConsentWithdrawalToken({
+        sitePublicId: "site_public",
+        anonymousSubject: "anon_123",
+        receiptId: "8c27c5e4-8981-41a0-a386-61f8bab1279e",
+        expiresAt: 5_000,
+      });
+      expect(
+        verifyConsentWithdrawalToken({
+          token: withdrawal,
+          expectedSitePublicId: "site_public",
+          nowSeconds: 4_000,
+        })
+      ).toEqual({ anonymousSubject: "anon_123", receiptId: "8c27c5e4-8981-41a0-a386-61f8bab1279e" });
+    } finally {
+      process.env.IDENTITY_KEY_ENCRYPTION_SECRET = prior;
+    }
   });
 });

@@ -38,6 +38,13 @@ type DrizzleCondition = {
 
 const dbMock = vi.hoisted(() => ({
   rows: [] as SiteRow[],
+  identityResolution: null as {
+    enabled: boolean;
+    complianceState: string;
+    policyVersion: string;
+    primaryProvider: string;
+    transport: string;
+  } | null,
   queries: [] as Array<{ column: string | undefined; value: unknown }>,
   select: vi.fn(),
 }));
@@ -90,31 +97,34 @@ function getConditionDetails(condition: DrizzleCondition): { column: string | un
 
 beforeEach(() => {
   dbMock.rows.length = 0;
+  dbMock.identityResolution = null;
   dbMock.queries.length = 0;
   dbMock.select.mockReset();
   (siteConfig as unknown as { cache: Map<string, unknown> }).cache.clear();
 
   dbMock.select.mockImplementation(() => ({
     from: () => ({
-      where: (condition: DrizzleCondition) => ({
-        limit: async () => {
-          const query = getConditionDetails(condition);
-          dbMock.queries.push(query);
+      leftJoin: () => ({
+        where: (condition: DrizzleCondition) => ({
+          limit: async () => {
+            const query = getConditionDetails(condition);
+            dbMock.queries.push(query);
 
-          const row = dbMock.rows.find(site => {
-            if (query.column === "id") {
-              return site.id === query.value;
-            }
+            const row = dbMock.rows.find(site => {
+              if (query.column === "id") {
+                return site.id === query.value;
+              }
 
-            if (query.column === "site_id") {
-              return site.siteId === query.value;
-            }
+              if (query.column === "site_id") {
+                return site.siteId === query.value;
+              }
 
-            return false;
-          });
+              return false;
+            });
 
-          return row ? [row] : [];
-        },
+            return row ? [{ site: row, identityResolution: dbMock.identityResolution }] : [];
+          },
+        }),
       }),
     }),
   }));
@@ -177,6 +187,28 @@ describe("siteConfig.getConfig", () => {
       { column: "id", value: "123" },
       { column: "site_id", value: 123 },
     ]);
+  });
+
+  it("caches identity resolution settings and refreshes them after invalidation", async () => {
+    dbMock.rows.push(createSiteRow({ id: "site_public", siteId: 7 }));
+    dbMock.identityResolution = {
+      enabled: true,
+      complianceState: "approved",
+      policyVersion: "identity-v2",
+      primaryProvider: "customers_ai",
+      transport: "pixel",
+    };
+
+    const first = await siteConfig.getConfig("site_public");
+    await siteConfig.getConfig("site_public");
+    expect(first?.identityResolution).toEqual(dbMock.identityResolution);
+    expect(dbMock.queries).toHaveLength(1);
+
+    siteConfig.clearCache();
+    dbMock.identityResolution = { ...dbMock.identityResolution, enabled: false };
+    const refreshed = await siteConfig.getConfig("site_public");
+    expect(refreshed?.identityResolution?.enabled).toBe(false);
+    expect(dbMock.queries).toHaveLength(2);
   });
 });
 

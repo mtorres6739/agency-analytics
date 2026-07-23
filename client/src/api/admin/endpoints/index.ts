@@ -12,6 +12,8 @@ export {
   fetchIdentitySettings,
   updateIdentitySettings,
   rotateIdentityKey,
+  fetchResolutionSettings,
+  updateResolutionSettings,
 } from "./sites";
 export type {
   SiteResponse,
@@ -19,6 +21,7 @@ export type {
   SiteUsageResponse,
   IdentitySettings,
   IdentityTraitKey,
+  SiteResolutionSettings,
 } from "./sites";
 
 // Organizations endpoints

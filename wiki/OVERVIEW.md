@@ -19,6 +19,7 @@ This repository is a maintained AGPL fork of Rybbit for agency-wide client analy
 - [Roadmap](../docs/ROADMAP.md)
 - [Test and acceptance](../docs/TEST_ACCEPTANCE.md)
 - [Upstream audit revalidation](../docs/UPSTREAM_AUDIT_REVALIDATION.md)
+- [Provider-neutral identity operations](../docs/PROVIDER_IDENTITY.md)
 
 ## Durable boundaries
 
@@ -77,9 +78,17 @@ Palm Squad verified identity went live on 2026-07-21 with active key version 2. 
 
 Anonymous visitors retain deterministic aliases for session continuity, but the user detail header explicitly labels those aliases `Anonymous`. Name and email are displayed only when the site has created a verified identified profile; ordinary pageviews cannot infer either trait.
 
+Provider-neutral visitor identity is implemented behind fail-closed policy gates on `codex/provider-neutral-identity`. CustomersAI and RB2B adapters use configurable signed sandbox endpoints; PDL can fill only missing allowed fields. The SDM tracker owns affirmative consent, honors GPC, restricts resolution to server-derived US traffic, creates encrypted ten-minute BullMQ jobs, stores normalized candidates and field provenance, atomically reserves site and organization budgets, and maintains suppression hashes. Provider identifiers are encrypted only for retryable provider deletion and never returned through application APIs. The Users screen owns the Possible matches review queue, deterministic ICP score, bounded AI brief, and explicit optional GHL routing. OSPRY is excluded. No provider is live until its DPA, data rights, deletion support, sandbox schema, health test, and sub-$750 commitment are approved; Palm Squad remains the shadow-mode consumer pilot.
+
 The identity kill switch applies to every identity source, including dashboard-initiated manual identification. Compliance-blocked or disabled sites do not render the manual action, and the server independently rejects attempts with a stable policy error.
 
 A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocks DNS-only Vercel domains; those projects use the Vercel/GitHub preview-PR adapter instead.
+
+Provider-neutral visitor identity is implemented on PR `#21` and remains disabled by default. The branch is rebased onto production release `dfb4f48a17de06aa3776677b3112fce33713f9d1`. Review hardening makes accepted webhook replay markers durable while releasing rejected attempts, keeps failed consent withdrawals retryable, caches public tracker identity configuration, commits candidate/profile/suppression state before CRM or provider-deletion side effects, and records provider usage once per logical BullMQ attempt. The client rolls failed budget edits back to the last confirmed server state. Next.js is pinned to patched `16.2.11`; production dependency audits for both client and server report zero vulnerabilities after tested transitive overrides.
+
+Final review hardening adds migration `0023` and a transactional provider-deletion outbox so local erasure and the durable external deletion request commit together. Browser consent is scoped by analytics origin and site, immediately stops identity matching during a failed withdrawal while retaining a retry token, waits for `document.body`, and rejects cross-origin connectors. Paid provider pricing is required and finite; invalid pricing or an organization cap outside $0-$750 blocks approval and activation.
+
+No CustomersAI, RB2B, or PDL credentials may be added until the provider supplies approved sandbox schemas, webhook and deletion details, a DPA and subprocessor list, written multi-client display/storage/export/deletion rights, and pricing within the $750 monthly pilot cap. Palm Squad remains the first consumer shadow pilot after those gates pass; provider-derived candidates must not route to GHL or trigger outreach automatically.
 
 ## Knowledge rule
 

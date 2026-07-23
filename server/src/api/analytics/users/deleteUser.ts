@@ -2,10 +2,20 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { and, eq, or } from "drizzle-orm";
 import { clickhouse } from "../../../db/clickhouse/clickhouse.js";
 import { db } from "../../../db/postgres/postgres.js";
-import { userAliases, userProfiles } from "../../../db/postgres/schema.js";
+import {
+  identityCandidates,
+  identityConsentReceipts,
+  identityResolutionAttempts,
+  identitySuppressions,
+  sites,
+  userAliases,
+  userProfiles,
+} from "../../../db/postgres/schema.js";
 import { r2Storage } from "../../../services/storage/r2StorageService.js";
 import { processResults } from "../utils/utils.js";
 import { auditSiteIdentityEvent } from "../../../services/identity/identityAuditService.js";
+import { deriveScopedIdentityKey } from "../../../services/identity/identityCrypto.js";
+import { identityResolutionService } from "../../../services/identityResolution/resolutionService.js";
 
 export interface DeleteUserRequest {
   Params: {
@@ -34,6 +44,23 @@ export async function deleteUser(req: FastifyRequest<DeleteUserRequest>, res: Fa
       .from(userAliases)
       .where(and(eq(userAliases.siteId, siteId), eq(userAliases.userId, userId)));
     const deviceIds = [userId, ...aliases.map(a => a.anonymousId)];
+    const [site] = await db.select({ publicId: sites.id }).from(sites).where(eq(sites.siteId, siteId)).limit(1);
+    const candidateCondition = and(
+      eq(identityCandidates.siteId, siteId),
+      or(
+        eq(identityCandidates.linkedUserId, userId),
+        ...deviceIds.map(id => eq(identityCandidates.anonymousSubject, id))
+      )
+    );
+    const providerCandidates = await db
+      .select({
+        id: identityCandidates.id,
+        siteId: identityCandidates.siteId,
+        provider: identityCandidates.provider,
+        providerSubjectRef: identityCandidates.providerSubjectRef,
+      })
+      .from(identityCandidates)
+      .where(candidateCondition);
 
     const userCondition = `site_id = {siteId:UInt16}
       AND (
@@ -72,14 +99,50 @@ export async function deleteUser(req: FastifyRequest<DeleteUserRequest>, res: Fa
       )
     );
 
-    await Promise.all([
-      db.delete(userProfiles).where(and(eq(userProfiles.siteId, siteId), eq(userProfiles.userId, userId))),
-      db
+    let deletionOutboxIds: string[] = [];
+    await db.transaction(async tx => {
+      deletionOutboxIds = (await identityResolutionService.stageProviderDeletions(providerCandidates, tx)).map(
+        record => record.id
+      );
+      await tx.delete(userProfiles).where(and(eq(userProfiles.siteId, siteId), eq(userProfiles.userId, userId)));
+      await tx
         .delete(userAliases)
         .where(
           and(eq(userAliases.siteId, siteId), or(eq(userAliases.userId, userId), eq(userAliases.anonymousId, userId)))
-        ),
-    ]);
+        );
+      await tx.delete(identityCandidates).where(candidateCondition);
+      await tx
+        .delete(identityResolutionAttempts)
+        .where(
+          and(
+            eq(identityResolutionAttempts.siteId, siteId),
+            or(...deviceIds.map(id => eq(identityResolutionAttempts.anonymousSubject, id)))
+          )
+        );
+      await tx
+        .delete(identityConsentReceipts)
+        .where(
+          and(
+            eq(identityConsentReceipts.siteId, siteId),
+            or(...deviceIds.map(id => eq(identityConsentReceipts.anonymousSubject, id)))
+          )
+        );
+
+      if (site?.publicId) {
+        const publicSiteId = site.publicId;
+        await tx
+          .insert(identitySuppressions)
+          .values(
+            deviceIds.map(id => ({
+              siteId,
+              suppressionKey: deriveScopedIdentityKey(publicSiteId, "identity-suppression-v1", id),
+              reason: "deleted",
+            }))
+          )
+          .onConflictDoNothing();
+      }
+    });
+    await identityResolutionService.dispatchProviderDeletions(deletionOutboxIds);
 
     await auditSiteIdentityEvent({
       siteId,

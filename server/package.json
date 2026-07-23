@@ -52,6 +52,7 @@
     "dotenv": "16.5.0",
     "drizzle-orm": "0.45.2",
     "fastify": "5.8.5",
+    "fastify-raw-body": "^5.0.0",
     "i18n-iso-countries": "^7.14.0",
     "ioredis": "^5.8.2",
     "ip-address": "^10.0.1",
@@ -95,5 +96,9 @@
     "terser": "^5.40.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.2"
+  },
+  "overrides": {
+    "@hono/node-server": "2.0.11",
+    "find-my-way": "9.7.0"
   }
 }

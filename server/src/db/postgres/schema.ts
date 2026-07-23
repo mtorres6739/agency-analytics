@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import type { DashboardConfig } from "@rybbit/shared";
+import type { DashboardConfig, FieldProvenance } from "@rybbit/shared";
 import {
   boolean,
   check,
@@ -1108,6 +1108,277 @@ export const siteIdentityKeys = pgTable(
     check("site_identity_keys_status_check", sql`${table.status} IN ('pending', 'active', 'retired', 'revoked')`),
     check("site_identity_keys_version_check", sql`${table.version} > 0`),
   ]
+);
+
+// Organization-scoped, replaceable identity provider connections. credentialRef
+// points at a server-side secret source (normally an environment variable or
+// secret-manager key); credentials are never stored in this table or returned.
+export const identityProviderConnections = pgTable(
+  "identity_provider_connections",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    externalAccountId: text("external_account_id"),
+    capabilities: jsonb("capabilities").$type<string[]>().notNull().default([]),
+    status: text("status").notNull().default("pending"),
+    credentialRef: text("credential_ref"),
+    policyAttestations: jsonb("policy_attestations").$type<Record<string, boolean>>().notNull().default({}),
+    policyApprovedBy: text("policy_approved_by"),
+    policyApprovedAt: timestamp("policy_approved_at", { mode: "string" }),
+    lastHealthCheckAt: timestamp("last_health_check_at", { mode: "string" }),
+    lastHealthStatus: text("last_health_status"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    unique("identity_provider_connections_org_provider_unique").on(table.organizationId, table.provider),
+    check("identity_provider_connections_provider_check", sql`${table.provider} IN ('customers_ai', 'rb2b', 'pdl')`),
+    check(
+      "identity_provider_connections_status_check",
+      sql`${table.status} IN ('pending', 'approved', 'disabled', 'failed')`
+    ),
+  ]
+);
+
+export const siteResolutionSettings = pgTable(
+  "site_resolution_settings",
+  {
+    siteId: integer("site_id")
+      .primaryKey()
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(false),
+    mode: text("mode").notNull().default("consumer"),
+    primaryProvider: text("primary_provider").notNull().default("customers_ai"),
+    transport: text("transport").notNull().default("server"),
+    enrichmentProvider: text("enrichment_provider"),
+    enrichmentEnabled: boolean("enrichment_enabled").notNull().default(false),
+    shadowMode: boolean("shadow_mode").notNull().default(true),
+    deterministicThreshold: real("deterministic_threshold").notNull().default(0.95),
+    enrichmentThreshold: real("enrichment_threshold").notNull().default(0.8),
+    dailyCap: integer("daily_cap").notNull().default(100),
+    monthlyBudgetCents: integer("monthly_budget_cents").notNull().default(75000),
+    complianceState: text("compliance_state").notNull().default("pending"),
+    policyVersion: text("policy_version").notNull().default("identity-v1"),
+    icpCriteria: jsonb("icp_criteria")
+      .$type<{ companyKeywords?: string[]; titleKeywords?: string[]; minimumConfidence?: number }>()
+      .notNull()
+      .default({}),
+    allowedTraits: jsonb("allowed_traits")
+      .$type<string[]>()
+      .notNull()
+      .default(["name", "email", "company", "title", "linkedinUrl", "location"]),
+    phoneEnabled: boolean("phone_enabled").notNull().default(false),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    check("site_resolution_settings_mode_check", sql`${table.mode} IN ('consumer', 'business')`),
+    check("site_resolution_settings_primary_provider_check", sql`${table.primaryProvider} IN ('customers_ai', 'rb2b')`),
+    check("site_resolution_settings_transport_check", sql`${table.transport} IN ('server', 'pixel')`),
+    check(
+      "site_resolution_settings_enrichment_provider_check",
+      sql`${table.enrichmentProvider} IS NULL OR ${table.enrichmentProvider} = 'pdl'`
+    ),
+    check(
+      "site_resolution_settings_compliance_check",
+      sql`${table.complianceState} IN ('pending', 'approved', 'blocked')`
+    ),
+    check(
+      "site_resolution_settings_thresholds_check",
+      sql`${table.deterministicThreshold} BETWEEN 0 AND 1 AND ${table.enrichmentThreshold} BETWEEN 0 AND 1`
+    ),
+    check(
+      "site_resolution_settings_caps_check",
+      sql`${table.dailyCap} >= 0 AND ${table.monthlyBudgetCents} BETWEEN 0 AND 75000`
+    ),
+    check("site_resolution_settings_phone_disabled_check", sql`${table.phoneEnabled} = false`),
+  ]
+);
+
+export const identityConsentReceipts = pgTable(
+  "identity_consent_receipts",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    anonymousSubject: text("anonymous_subject").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    permittedCategories: jsonb("permitted_categories").$type<string[]>().notNull().default([]),
+    region: text("region"),
+    gpc: boolean("gpc").notNull().default(false),
+    granted: boolean("granted").notNull().default(false),
+    grantedAt: timestamp("granted_at", { mode: "string" }),
+    withdrawnAt: timestamp("withdrawn_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    index("identity_consent_receipts_site_subject_idx").on(table.siteId, table.anonymousSubject),
+    index("identity_consent_receipts_created_idx").on(table.siteId, table.createdAt),
+  ]
+);
+
+export const identityResolutionAttempts = pgTable(
+  "identity_resolution_attempts",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    anonymousSubject: text("anonymous_subject").notNull(),
+    provider: text("provider").notNull(),
+    status: text("status").notNull(),
+    confidence: real("confidence"),
+    providerRequestId: text("provider_request_id"),
+    estimatedCostMicros: integer("estimated_cost_micros").notNull().default(0),
+    rejectionCode: text("rejection_code"),
+    startedAt: timestamp("started_at", { mode: "string" }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { mode: "string" }),
+  },
+  table => [
+    index("identity_resolution_attempts_site_started_idx").on(table.siteId, table.startedAt),
+    index("identity_resolution_attempts_subject_idx").on(table.siteId, table.anonymousSubject),
+    check("identity_resolution_attempts_provider_check", sql`${table.provider} IN ('customers_ai', 'rb2b')`),
+    check(
+      "identity_resolution_attempts_status_check",
+      sql`${table.status} IN ('queued', 'matched', 'no_match', 'blocked', 'failed')`
+    ),
+  ]
+);
+
+export const identityCandidates = pgTable(
+  "identity_candidates",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    anonymousSubject: text("anonymous_subject").notNull(),
+    provider: text("provider").notNull(),
+    providerSubjectKey: text("provider_subject_key").notNull(),
+    providerSubjectRef: text("provider_subject_ref"),
+    providerRequestId: text("provider_request_id"),
+    confidence: real("confidence").notNull(),
+    matchMethod: text("match_method").notNull(),
+    traits: jsonb("traits").$type<Record<string, unknown>>().notNull().default({}),
+    provenance: jsonb("provenance").$type<FieldProvenance[]>().notNull().default([]),
+    reviewStatus: text("review_status").notNull().default("pending"),
+    linkedUserId: text("linked_user_id"),
+    crmContactId: text("crm_contact_id"),
+    icpScore: integer("icp_score"),
+    aiBrief: text("ai_brief"),
+    briefGeneratedAt: timestamp("brief_generated_at", { mode: "string" }),
+    expiresAt: timestamp("expires_at", { mode: "string" }).notNull(),
+    reviewedAt: timestamp("reviewed_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    unique("identity_candidates_site_provider_subject_unique").on(
+      table.siteId,
+      table.provider,
+      table.providerSubjectKey
+    ),
+    index("identity_candidates_site_status_idx").on(table.siteId, table.reviewStatus, table.createdAt),
+    check("identity_candidates_provider_check", sql`${table.provider} IN ('customers_ai', 'rb2b')`),
+    check("identity_candidates_match_method_check", sql`${table.matchMethod} IN ('deterministic', 'probabilistic')`),
+    check(
+      "identity_candidates_review_status_check",
+      sql`${table.reviewStatus} IN ('pending', 'approved', 'rejected', 'suppressed', 'expired')`
+    ),
+    check("identity_candidates_confidence_check", sql`${table.confidence} BETWEEN 0 AND 1`),
+  ]
+);
+
+export const identityActivationReviews = pgTable(
+  "identity_activation_reviews",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    candidateId: uuid("candidate_id").references(() => identityCandidates.id, { onDelete: "set null" }),
+    reviewerId: text("reviewer_id").references(() => user.id, { onDelete: "set null" }),
+    decision: text("decision").notNull(),
+    crmStatus: text("crm_status"),
+    crmContactId: text("crm_contact_id"),
+    sanitizedResult: jsonb("sanitized_result").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    index("identity_activation_reviews_candidate_idx").on(table.candidateId),
+    check(
+      "identity_activation_reviews_decision_check",
+      sql`${table.decision} IN ('approved', 'rejected', 'suppressed', 'sent_to_crm')`
+    ),
+  ]
+);
+
+export const identityProviderUsage = pgTable(
+  "identity_provider_usage",
+  {
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    usageDate: text("usage_date").notNull(),
+    requests: integer("requests").notNull().default(0),
+    matches: integer("matches").notNull().default(0),
+    failures: integer("failures").notNull().default(0),
+    totalLatencyMs: integer("total_latency_ms").notNull().default(0),
+    estimatedCostMicros: integer("estimated_cost_micros").notNull().default(0),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.siteId, table.provider, table.usageDate] }),
+    check("identity_provider_usage_provider_check", sql`${table.provider} IN ('customers_ai', 'rb2b', 'pdl')`),
+  ]
+);
+
+// Transactional outbox for privacy deletion requests. The encrypted provider
+// reference remains durable even after the local candidate/profile is removed.
+export const identityProviderDeletionOutbox = pgTable(
+  "identity_provider_deletion_outbox",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    siteId: integer("site_id").notNull(),
+    candidateId: uuid("candidate_id"),
+    provider: text("provider").notNull(),
+    providerSubjectRef: text("provider_subject_ref").notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    queuedAt: timestamp("queued_at", { mode: "string" }),
+    completedAt: timestamp("completed_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    index("identity_provider_deletion_outbox_status_idx").on(table.status, table.createdAt),
+    unique("identity_provider_deletion_outbox_candidate_unique").on(table.candidateId),
+    check("identity_provider_deletion_outbox_provider_check", sql`${table.provider} IN ('customers_ai', 'rb2b')`),
+    check(
+      "identity_provider_deletion_outbox_status_check",
+      sql`${table.status} IN ('pending', 'queued', 'completed', 'failed')`
+    ),
+  ]
+);
+
+export const identitySuppressions = pgTable(
+  "identity_suppressions",
+  {
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.siteId, { onDelete: "cascade" }),
+    suppressionKey: text("suppression_key").notNull(),
+    reason: text("reason").notNull().default("withdrawn"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [primaryKey({ columns: [table.siteId, table.suppressionKey] })]
 );
 
 // Cancellation feedback for churn reduction

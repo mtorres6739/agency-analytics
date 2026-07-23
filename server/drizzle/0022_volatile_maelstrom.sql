@@ -1,0 +1,2 @@
+ALTER TABLE "identity_provider_connections" ADD COLUMN "policy_attestations" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "identity_provider_connections" ADD COLUMN "policy_approved_by" text;

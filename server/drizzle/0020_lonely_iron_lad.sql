@@ -1,0 +1,1 @@
+ALTER TABLE "identity_candidates" ADD COLUMN "provider_subject_ref" text;

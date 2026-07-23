@@ -87,6 +87,9 @@ describe("parseScriptConfig", () => {
           rolloutPercentage: 100,
         },
       },
+      identityResolutionEnabled: false,
+      identityPolicyVersion: "identity-v1",
+      identityConnectorUrl: null,
       skipPatterns: [],
       maskPatterns: [],
       sessionReplayBatchInterval: 5000,
@@ -142,6 +145,9 @@ describe("parseScriptConfig", () => {
       trackFormInteractions: false,
       tag: "",
       featureFlags: {},
+      identityResolutionEnabled: false,
+      identityPolicyVersion: "identity-v1",
+      identityConnectorUrl: null,
       skipPatterns: [],
       maskPatterns: [],
       sessionReplayBatchInterval: 5000,
@@ -161,6 +167,40 @@ describe("parseScriptConfig", () => {
     });
 
     expect(consoleWarnSpy).toHaveBeenCalledWith("Failed to fetch tracking config from API, using defaults");
+  });
+
+  it("maps nested identity resolution API settings and honors the script disable flag", async () => {
+    mockScriptTag.setAttribute("src", "https://analytics.example.com/script.js");
+    mockScriptTag.setAttribute("data-site-id", "123");
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          identityResolution: {
+            enabled: true,
+            policyVersion: "identity-v2",
+            connectorUrl: "https://analytics.example.com/identity/connector.js",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ flags: {} }) });
+
+    const enabled = await parseScriptConfig(mockScriptTag);
+    expect(enabled).toMatchObject({
+      identityResolutionEnabled: true,
+      identityPolicyVersion: "identity-v2",
+      identityConnectorUrl: "https://analytics.example.com/identity/connector.js",
+    });
+
+    mockScriptTag.setAttribute("data-identity-resolution", "false");
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ identityResolution: { enabled: true } }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ flags: {} }) });
+    const disabled = await parseScriptConfig(mockScriptTag);
+    expect(disabled?.identityResolutionEnabled).toBe(false);
   });
 
   it("should use defaults when network error occurs", async () => {
@@ -190,6 +230,9 @@ describe("parseScriptConfig", () => {
       trackFormInteractions: false,
       tag: "",
       featureFlags: {},
+      identityResolutionEnabled: false,
+      identityPolicyVersion: "identity-v1",
+      identityConnectorUrl: null,
       skipPatterns: [],
       maskPatterns: [],
       sessionReplayBatchInterval: 5000,

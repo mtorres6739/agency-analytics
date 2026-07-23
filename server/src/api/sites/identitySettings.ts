@@ -21,7 +21,7 @@ import {
 } from "../../services/identity/identityProvisioningService.js";
 import { getIdentityComplianceBlock } from "../../services/identity/identityCompliance.js";
 
-const traitKeys = ["name", "email", "company", "plan"] as const;
+const traitKeys = ["name", "email", "company", "plan", "title", "linkedinUrl", "location"] as const;
 const updateSchema = z
   .object({
     enabled: z.boolean().optional(),

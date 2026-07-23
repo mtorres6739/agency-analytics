@@ -27,6 +27,33 @@ class IdentityRetentionService {
       SELECT count(*)::int AS deleted_profiles FROM deleted_profiles
     `);
     const count = Number(result[0]?.deleted_profiles ?? 0);
+    await Promise.all([
+      db.execute(sql`DELETE FROM identity_candidates WHERE expires_at < now()`),
+      db.execute(sql`
+        DELETE FROM identity_resolution_attempts a
+        USING site_identity_settings s
+        WHERE a.site_id = s.site_id
+          AND a.started_at < now() - make_interval(days => s.retention_days)
+      `),
+      db.execute(sql`
+        DELETE FROM identity_consent_receipts c
+        USING site_identity_settings s
+        WHERE c.site_id = s.site_id
+          AND c.created_at < now() - make_interval(days => s.retention_days)
+          AND (c.granted = false OR c.withdrawn_at IS NOT NULL)
+      `),
+      db.execute(sql`
+        DELETE FROM identity_provider_usage u
+        USING site_identity_settings s
+        WHERE u.site_id = s.site_id
+          AND u.usage_date::date < current_date - s.retention_days
+      `),
+      db.execute(sql`
+        DELETE FROM identity_provider_deletion_outbox
+        WHERE status = 'completed'
+          AND completed_at < now() - interval '30 days'
+      `),
+    ]);
     if (count > 0) this.logger.info({ count }, "Expired identified profiles deleted");
     return count;
   }
@@ -38,6 +65,11 @@ class IdentityRetentionService {
       () => void this.run().catch(error => this.logger.error({ error }, "Identity retention job failed")),
       { timezone: "UTC" }
     );
+  }
+
+  stop() {
+    this.task?.stop();
+    this.task = null;
   }
 }
 
