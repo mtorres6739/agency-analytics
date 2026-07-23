@@ -1,6 +1,6 @@
 import { eq, type SQL } from "drizzle-orm";
 import { db } from "../db/postgres/postgres.js";
-import { sites } from "../db/postgres/schema.js";
+import { siteResolutionSettings, sites } from "../db/postgres/schema.js";
 import { matchesCIDR, matchesRange } from "./ipUtils.js";
 import { logger } from "./logger/logger.js";
 
@@ -32,9 +32,25 @@ export interface SiteConfigData {
   trackCopy: boolean;
   trackFormInteractions: boolean;
   tags: string[];
+  identityResolution?: {
+    enabled: boolean;
+    complianceState: string;
+    policyVersion: string;
+    primaryProvider: string;
+    transport: string;
+  };
 }
 
-type SiteConfigRow = typeof sites.$inferSelect;
+type SiteConfigRow = {
+  site: typeof sites.$inferSelect;
+  identityResolution: {
+    enabled: boolean;
+    complianceState: string;
+    policyVersion: string;
+    primaryProvider: string;
+    transport: string;
+  } | null;
+};
 
 class SiteConfig {
   private cache = new Map<string, { data: SiteConfigData; expires: number }>();
@@ -56,7 +72,21 @@ class SiteConfig {
   }
 
   private async querySiteConfig(where: SQL): Promise<SiteConfigRow | undefined> {
-    const [site] = await db.select().from(sites).where(where).limit(1);
+    const [site] = await db
+      .select({
+        site: sites,
+        identityResolution: {
+          enabled: siteResolutionSettings.enabled,
+          complianceState: siteResolutionSettings.complianceState,
+          policyVersion: siteResolutionSettings.policyVersion,
+          primaryProvider: siteResolutionSettings.primaryProvider,
+          transport: siteResolutionSettings.transport,
+        },
+      })
+      .from(sites)
+      .leftJoin(siteResolutionSettings, eq(siteResolutionSettings.siteId, sites.siteId))
+      .where(where)
+      .limit(1);
 
     return site;
   }
@@ -92,33 +122,41 @@ class SiteConfig {
         return undefined;
       }
 
+      const row = site.site;
       const configData: SiteConfigData = {
-        id: site.id,
-        siteId: site.siteId,
-        type: site.type || "web",
-        public: site.public || false,
-        embedEnabled: site.embedEnabled || false,
-        saltUserIds: site.saltUserIds || false,
-        domain: site.domain || "",
-        blockBots: site.blockBots === undefined ? true : site.blockBots,
-        excludedIPs: Array.isArray(site.excludedIPs) ? site.excludedIPs : [],
-        excludedCountries: Array.isArray(site.excludedCountries) ? site.excludedCountries : [],
-        excludedPaths: Array.isArray(site.excludedPaths) ? site.excludedPaths : [],
-        excludedHostnames: Array.isArray(site.excludedHostnames) ? site.excludedHostnames : [],
-        excludedUserAgents: Array.isArray(site.excludedUserAgents) ? site.excludedUserAgents : [],
-        privateLinkKey: site.privateLinkKey,
-        sessionReplay: site.sessionReplay || false,
-        webVitals: site.webVitals || false,
-        trackErrors: site.trackErrors || false,
-        trackOutbound: site.trackOutbound ?? true,
-        trackUrlParams: site.trackUrlParams ?? true,
-        trackInitialPageView: site.trackInitialPageView ?? true,
-        trackSpaNavigation: site.trackSpaNavigation ?? true,
-        trackIp: site.trackIp || false,
-        trackButtonClicks: site.trackButtonClicks || false,
-        trackCopy: site.trackCopy || false,
-        trackFormInteractions: site.trackFormInteractions || false,
-        tags: Array.isArray(site.tags) ? site.tags : [],
+        id: row.id,
+        siteId: row.siteId,
+        type: row.type || "web",
+        public: row.public || false,
+        embedEnabled: row.embedEnabled || false,
+        saltUserIds: row.saltUserIds || false,
+        domain: row.domain || "",
+        blockBots: row.blockBots === undefined ? true : row.blockBots,
+        excludedIPs: Array.isArray(row.excludedIPs) ? row.excludedIPs : [],
+        excludedCountries: Array.isArray(row.excludedCountries) ? row.excludedCountries : [],
+        excludedPaths: Array.isArray(row.excludedPaths) ? row.excludedPaths : [],
+        excludedHostnames: Array.isArray(row.excludedHostnames) ? row.excludedHostnames : [],
+        excludedUserAgents: Array.isArray(row.excludedUserAgents) ? row.excludedUserAgents : [],
+        privateLinkKey: row.privateLinkKey,
+        sessionReplay: row.sessionReplay || false,
+        webVitals: row.webVitals || false,
+        trackErrors: row.trackErrors || false,
+        trackOutbound: row.trackOutbound ?? true,
+        trackUrlParams: row.trackUrlParams ?? true,
+        trackInitialPageView: row.trackInitialPageView ?? true,
+        trackSpaNavigation: row.trackSpaNavigation ?? true,
+        trackIp: row.trackIp || false,
+        trackButtonClicks: row.trackButtonClicks || false,
+        trackCopy: row.trackCopy || false,
+        trackFormInteractions: row.trackFormInteractions || false,
+        tags: Array.isArray(row.tags) ? row.tags : [],
+        identityResolution: {
+          enabled: site.identityResolution?.enabled ?? false,
+          complianceState: site.identityResolution?.complianceState ?? "pending",
+          policyVersion: site.identityResolution?.policyVersion ?? "identity-v1",
+          primaryProvider: site.identityResolution?.primaryProvider ?? "customers_ai",
+          transport: site.identityResolution?.transport ?? "server",
+        },
       };
 
       this.cache.set(cacheKey, {
@@ -141,6 +179,10 @@ class SiteConfig {
     return this.getSiteByAnyId(siteIdOrId);
   }
 
+  clearCache(): void {
+    this.cache.clear();
+  }
+
   async updateConfig(siteIdOrId: number | string, config: Partial<SiteConfigData>): Promise<void> {
     try {
       const isNumeric = this.isNumericId(siteIdOrId);
@@ -159,7 +201,7 @@ class SiteConfig {
   /**
    * Add a new site
    */
-  async addSite(config: Omit<SiteConfigData, "siteId">): Promise<void> {
+  async addSite(config: Omit<SiteConfigData, "siteId" | "identityResolution">): Promise<void> {
     try {
       await db.insert(sites).values({
         id: config.id,

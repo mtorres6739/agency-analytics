@@ -26,12 +26,17 @@ const responseSchema = z.union([
   candidateSchema.transform(candidate => ({ candidates: [candidate], request_id: candidate.request_id })),
 ]);
 
-export function normalizeProviderResponse(provider: IdentityProvider, payload: unknown): {
+export function normalizeProviderResponse(
+  provider: IdentityProvider,
+  payload: unknown
+): {
   candidates: ResolutionCandidate[];
   requestId?: string;
 } {
   const parsed = responseSchema.safeParse(payload);
-  if (!parsed.success) throw new ProviderResponseError(`${provider} returned an unsupported response`);
+  if (!parsed.success) {
+    throw new ProviderResponseError(`${provider} returned an unsupported response: ${parsed.error.message}`);
+  }
   const observedAt = new Date().toISOString();
   return {
     requestId: parsed.data.request_id,

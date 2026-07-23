@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   redisSet: vi.fn(),
+  redisDel: vi.fn(),
   getConfig: vi.fn(),
   verifyCorrelationToken: vi.fn(),
   normalizeProviderResponse: vi.fn(),
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   consentRows: [] as Array<{ id: string }>,
 }));
 
-vi.mock("../../db/redis/redis.js", () => ({ redis: { set: mocks.redisSet } }));
+vi.mock("../../db/redis/redis.js", () => ({ redis: { set: mocks.redisSet, del: mocks.redisDel } }));
 vi.mock("../../lib/siteConfig.js", () => ({ siteConfig: { getConfig: mocks.getConfig } }));
 vi.mock("../../services/identity/identityCrypto.js", () => ({
   verifyCorrelationToken: mocks.verifyCorrelationToken,
@@ -36,7 +37,11 @@ import { handleIdentityProviderWebhook } from "./providerWebhook.js";
 function signedRequest(body: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   const timestamp = String(Math.floor(Date.now() / 1000));
   const rawBody = Buffer.from(JSON.stringify(body));
-  const signature = createHmac("sha256", "webhook-test-secret").update(timestamp).update(".").update(rawBody).digest("hex");
+  const signature = createHmac("sha256", "webhook-test-secret")
+    .update(timestamp)
+    .update(".")
+    .update(rawBody)
+    .digest("hex");
   return {
     params: { provider: "customers_ai" },
     headers: { "x-identity-timestamp": timestamp, "x-identity-signature": signature },
@@ -73,6 +78,7 @@ describe("identity provider webhook", () => {
     vi.clearAllMocks();
     process.env.CUSTOMERS_AI_WEBHOOK_SECRET = "webhook-test-secret";
     mocks.redisSet.mockResolvedValue("OK");
+    mocks.redisDel.mockResolvedValue(1);
     mocks.getConfig.mockResolvedValue({ siteId: 7 });
     mocks.verifyCorrelationToken.mockReturnValue({ anonymousSubject: "anon_1", receiptId: "receipt_1" });
     mocks.normalizeProviderResponse.mockReturnValue({ requestId: "request_1", candidates: [] });
@@ -118,5 +124,30 @@ describe("identity provider webhook", () => {
     await handleIdentityProviderWebhook(signedRequest(payload), reply);
     expect(reply.statusCode).toBe(503);
     expect(mocks.ingestWebhookCandidates).not.toHaveBeenCalled();
+  });
+
+  it("releases the replay marker when consent is not active", async () => {
+    mocks.consentRows = [];
+    const reply = replyStub();
+    await handleIdentityProviderWebhook(signedRequest(payload), reply);
+    expect(reply.statusCode).toBe(403);
+    expect(reply.payload).toEqual({ error: "Consent is not active" });
+    expect(mocks.ingestWebhookCandidates).not.toHaveBeenCalled();
+    expect(mocks.redisDel).toHaveBeenCalledWith("identity:webhook:customers_ai:evt_1");
+  });
+
+  it("releases the replay marker when ingestion rejects the event", async () => {
+    mocks.ingestWebhookCandidates.mockResolvedValue({ accepted: false, code: "DISABLED" });
+    const reply = replyStub();
+    await handleIdentityProviderWebhook(signedRequest(payload), reply);
+    expect(reply.statusCode).toBe(403);
+    expect(mocks.redisDel).toHaveBeenCalledWith("identity:webhook:customers_ai:evt_1");
+  });
+
+  it("keeps the replay marker after accepted ingestion", async () => {
+    const reply = replyStub();
+    await handleIdentityProviderWebhook(signedRequest(payload), reply);
+    expect(reply.statusCode).toBe(202);
+    expect(mocks.redisDel).not.toHaveBeenCalled();
   });
 });

@@ -90,6 +90,7 @@ export async function handleIdentityConsent(request: FastifyRequest, reply: Fast
         })
         .onConflictDoNothing();
     }
+    return reply.send({ success: true, granted: false, gpc: decision.gpc, code: decision.code });
   } else {
     const [activeReceipt] = await db
       .select({ id: identityConsentReceipts.id })
@@ -134,9 +135,6 @@ export async function handleIdentityConsent(request: FastifyRequest, reply: Fast
     })
     .returning({ id: identityConsentReceipts.id });
 
-  if (!granted) {
-    return reply.send({ success: true, granted: false, gpc: decision.gpc, code: decision.code });
-  }
   const withdrawalToken = createConsentWithdrawalToken({
     sitePublicId: parsed.data.site_id,
     anonymousSubject: identity.anonymousSubject,
@@ -190,7 +188,6 @@ export async function handleIdentityWithdrawal(request: FastifyRequest, reply: F
   ];
   const suppressionKey = deriveScopedIdentityKey(parsed.data.site_id, "identity-suppression-v1", anonymousSubject);
   const now = new Date().toISOString();
-  const providerDeletionsQueued = await identityResolutionService.queueProviderDeletions(candidates);
   await db.transaction(async tx => {
     await tx
       .update(identityConsentReceipts)
@@ -224,6 +221,7 @@ export async function handleIdentityWithdrawal(request: FastifyRequest, reply: F
       .values({ siteId: config.siteId, suppressionKey, reason: "withdrawn" })
       .onConflictDoNothing();
   });
+  const providerDeletionsQueued = await identityResolutionService.queueProviderDeletions(candidates);
   const userIds = [anonymousSubject, ...linkedUserIds];
   await Promise.all(
     ["events", "session_replay_events", "session_replay_metadata"].map(table =>

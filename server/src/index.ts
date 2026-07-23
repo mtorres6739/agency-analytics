@@ -512,16 +512,8 @@ async function sitesRoutes(fastify: FastifyInstance) {
   fastify.get("/sites/:siteId/resolution-settings", authIdentityRead, getResolutionSettings);
   fastify.patch("/sites/:siteId/resolution-settings", adminIdentityWrite, updateResolutionSettings);
   fastify.get("/sites/:siteId/identity-candidates", authIdentityRead, listIdentityCandidates);
-  fastify.post(
-    "/sites/:siteId/identity-candidates/:candidateId/approve",
-    adminIdentityWrite,
-    approveIdentityCandidate
-  );
-  fastify.post(
-    "/sites/:siteId/identity-candidates/:candidateId/reject",
-    adminIdentityWrite,
-    rejectIdentityCandidate
-  );
+  fastify.post("/sites/:siteId/identity-candidates/:candidateId/approve", adminIdentityWrite, approveIdentityCandidate);
+  fastify.post("/sites/:siteId/identity-candidates/:candidateId/reject", adminIdentityWrite, rejectIdentityCandidate);
   fastify.post(
     "/sites/:siteId/identity-candidates/:candidateId/suppress",
     adminIdentityWrite,
@@ -573,11 +565,7 @@ async function organizationsRoutes(fastify: FastifyInstance) {
     testIdentityProviderConnection
   );
   fastify.get("/organizations/:organizationId/providers", orgOrgRead, listIdentityProviderConnections);
-  fastify.put(
-    "/organizations/:organizationId/providers/:provider",
-    orgAdminOrgWrite,
-    upsertIdentityProviderConnection
-  );
+  fastify.put("/organizations/:organizationId/providers/:provider", orgAdminOrgWrite, upsertIdentityProviderConnection);
 
   // Member site access management (admin/owner only)
   fastify.put("/organizations/:organizationId/members/:memberId/sites", orgAdminOrgWrite, updateMemberSiteAccess);
@@ -741,7 +729,7 @@ server.post("/api/identify", handleIdentify);
 server.post("/api/identify/verified", handleVerifiedIdentify);
 server.post("/api/identity/consent", { bodyLimit: 8 * 1024 }, handleIdentityConsent);
 server.post("/api/identity/withdraw", { bodyLimit: 8 * 1024 }, handleIdentityWithdrawal);
-server.post(
+server.post<{ Params: { provider: string }; Body: unknown }>(
   "/api/identity/provider-webhooks/:provider",
   { config: { rawBody: true }, bodyLimit: 64 * 1024 },
   handleIdentityProviderWebhook

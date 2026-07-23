@@ -10,9 +10,9 @@ import {
   fetchIdentityProviderUsage,
   generateIdentityLeadBrief,
   reviewIdentityCandidate,
-} from "../../../../api/analytics/endpoints/users";
-import { Button } from "../../../../components/ui/button";
-import { ErrorState } from "../../../../components/ErrorState";
+} from "@/api/analytics/endpoints/users";
+import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/ui/button";
 
 const trait = (value: unknown) => (typeof value === "string" && value.trim() ? value : "—");
 
@@ -26,7 +26,10 @@ export function IdentityCandidatesTable() {
     queryKey: ["identity-candidates", site],
     queryFn: () => fetchIdentityCandidates(site),
   });
-  const usage = useQuery({ queryKey: ["identity-provider-usage", site], queryFn: () => fetchIdentityProviderUsage(site) });
+  const usage = useQuery({
+    queryKey: ["identity-provider-usage", site],
+    queryFn: () => fetchIdentityProviderUsage(site),
+  });
   const review = useMutation({
     mutationFn: (input: { id: string; action: "approve" | "reject" | "suppress"; sendToCrm?: boolean }) =>
       reviewIdentityCandidate(site, input.id, input.action, input.sendToCrm),
@@ -47,7 +50,9 @@ export function IdentityCandidatesTable() {
     onError: () => toast.error("Lead brief generation failed"),
   });
   if (candidates.isError) {
-    return <ErrorState title="Failed to load possible matches" message="The identity candidate queue is unavailable." />;
+    return (
+      <ErrorState title="Failed to load possible matches" message="The identity candidate queue is unavailable." />
+    );
   }
   const totals = usage.data?.totals;
   const rows = (candidates.data?.data ?? []).filter(
@@ -73,7 +78,9 @@ export function IdentityCandidatesTable() {
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
           <div className="mb-1 font-semibold">AI lead brief</div>
           <p>{briefText}</p>
-          <button type="button" onClick={() => setBriefText(null)} className="mt-2 text-xs font-medium underline">Dismiss</button>
+          <button type="button" onClick={() => setBriefText(null)} className="mt-2 text-xs font-medium underline">
+            Dismiss
+          </button>
         </div>
       )}
       <div className="flex items-center justify-between gap-3">
@@ -83,19 +90,23 @@ export function IdentityCandidatesTable() {
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-            <input type="checkbox" checked={highIntentOnly} onChange={event => setHighIntentOnly(event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={highIntentOnly}
+              onChange={event => setHighIntentOnly(event.target.checked)}
+            />
             High ICP score
           </label>
           <select
-          aria-label="Candidate review status"
-          value={status}
-          onChange={event => setStatus(event.target.value as typeof status)}
-          className="rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm dark:border-neutral-700"
-        >
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="all">All</option>
+            aria-label="Candidate review status"
+            value={status}
+            onChange={event => setStatus(event.target.value as typeof status)}
+            className="rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm dark:border-neutral-700"
+          >
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="all">All</option>
           </select>
         </div>
       </div>
@@ -116,11 +127,17 @@ export function IdentityCandidatesTable() {
             {candidates.isLoading ? (
               Array.from({ length: 5 }).map((_, index) => (
                 <tr key={index} className="border-t border-neutral-200 dark:border-neutral-800">
-                  <td colSpan={7} className="p-3"><div className="h-6 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" /></td>
+                  <td colSpan={7} className="p-3">
+                    <div className="h-6 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+                  </td>
                 </tr>
               ))
             ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="p-8 text-center text-neutral-500">No candidates in this state.</td></tr>
+              <tr>
+                <td colSpan={7} className="p-8 text-center text-neutral-500">
+                  No candidates in this state.
+                </td>
+              </tr>
             ) : (
               rows.map(candidate => (
                 <tr key={candidate.id} className="border-t border-neutral-200 align-top dark:border-neutral-800">
@@ -143,7 +160,9 @@ export function IdentityCandidatesTable() {
                       <summary className="cursor-pointer">{candidate.provenance.length} fields</summary>
                       <ul className="mt-2 space-y-1 text-xs text-neutral-500">
                         {candidate.provenance.map((item, index) => (
-                          <li key={`${item.field}-${index}`}>{item.field}: {item.provider} ({Math.round(item.confidence * 100)}%)</li>
+                          <li key={`${item.field}-${index}`}>
+                            {item.field}: {item.provider} ({Math.round(item.confidence * 100)}%)
+                          </li>
                         ))}
                       </ul>
                     </details>
@@ -151,11 +170,48 @@ export function IdentityCandidatesTable() {
                   <td className="p-3">
                     {candidate.reviewStatus === "pending" ? (
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => review.mutate({ id: candidate.id, action: "reject" })} disabled={review.isPending} aria-label="Reject candidate"><X className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="outline" onClick={() => review.mutate({ id: candidate.id, action: "suppress" })} disabled={review.isPending} aria-label="Suppress candidate"><ShieldBan className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="outline" onClick={() => brief.mutate(candidate.id)} disabled={brief.isPending}>Brief</Button>
-                        <Button size="sm" onClick={() => review.mutate({ id: candidate.id, action: "approve" })} disabled={review.isPending}><Check className="mr-1 h-4 w-4" />Approve</Button>
-                        <Button size="sm" variant="outline" onClick={() => review.mutate({ id: candidate.id, action: "approve", sendToCrm: true })} disabled={review.isPending}>Approve + GHL</Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => review.mutate({ id: candidate.id, action: "reject" })}
+                          disabled={review.isPending}
+                          aria-label="Reject candidate"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => review.mutate({ id: candidate.id, action: "suppress" })}
+                          disabled={review.isPending}
+                          aria-label="Suppress candidate"
+                        >
+                          <ShieldBan className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => brief.mutate(candidate.id)}
+                          disabled={brief.isPending}
+                        >
+                          Brief
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => review.mutate({ id: candidate.id, action: "approve" })}
+                          disabled={review.isPending}
+                        >
+                          <Check className="mr-1 h-4 w-4" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => review.mutate({ id: candidate.id, action: "approve", sendToCrm: true })}
+                          disabled={review.isPending}
+                        >
+                          Approve + GHL
+                        </Button>
                       </div>
                     ) : (
                       <div className="text-right capitalize text-neutral-500">{candidate.reviewStatus}</div>

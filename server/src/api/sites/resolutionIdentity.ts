@@ -12,8 +12,9 @@ import {
   siteResolutionSettings,
   sites,
 } from "../../db/postgres/schema.js";
+import { siteConfig } from "../../lib/siteConfig.js";
 import { getIdentityComplianceBlock } from "../../services/identity/identityCompliance.js";
-import { persistIdentifiedUser } from "../../services/tracker/identifyService.js";
+import { backfillIdentifiedUserId, persistIdentifiedUser } from "../../services/tracker/identifyService.js";
 import { sendCandidateToGhl } from "../../services/identityResolution/ghlActivation.js";
 import { generateLeadBrief, scoreIdentityCandidate } from "../../services/identityResolution/leadIntelligence.js";
 import { deriveScopedIdentityKey } from "../../services/identity/identityCrypto.js";
@@ -222,6 +223,7 @@ export async function updateResolutionSettings(
       target: siteResolutionSettings.siteId,
       set: { ...parsed.data, phoneEnabled: false, updatedAt: now },
     });
+  siteConfig.clearCache();
   await audit(site, request.user?.id ?? null, "site.resolution_settings_updated", String(site.siteId));
   const [updated] = await db
     .select()
@@ -291,6 +293,8 @@ export async function listIdentityCandidates(
 
 const actionSchema = z.object({ sendToCrm: z.boolean().default(false) }).strict();
 
+class CandidateReviewConflictError extends Error {}
+
 async function candidateAction(
   request: FastifyRequest<{ Params: { siteId: string; candidateId: string }; Body: unknown }>,
   reply: FastifyReply,
@@ -311,48 +315,87 @@ async function candidateAction(
   if (candidate.reviewStatus !== "pending")
     return reply.status(409).send({ error: "Candidate has already been reviewed" });
 
-  let linkedUserId: string | null = null;
+  const linkedUserId = decision === "approved" ? `id_${candidate.providerSubjectKey}` : null;
   let crm = { status: null as string | null, contactId: null as string | null };
-  if (decision === "approved") {
-    linkedUserId = `id_${candidate.providerSubjectKey}`;
-    await persistIdentifiedUser({
-      siteId: site.siteId,
-      anonymousId: candidate.anonymousSubject,
-      userId: linkedUserId,
-      traits: candidate.traits,
-      identitySource: "resolved",
-    });
-    if (parsed.data.sendToCrm) crm = await sendCandidateToGhl({ siteId: site.siteId, traits: candidate.traits as any });
-  }
   const now = new Date().toISOString();
+  let backfillRequired = false;
+  let reviewId: string;
+  try {
+    reviewId = await db.transaction(async tx => {
+      const [reviewed] = await tx
+        .update(identityCandidates)
+        .set({ reviewStatus: decision, linkedUserId, reviewedAt: now, updatedAt: now })
+        .where(and(eq(identityCandidates.id, candidate.id), eq(identityCandidates.reviewStatus, "pending")))
+        .returning({ id: identityCandidates.id });
+      if (!reviewed) throw new CandidateReviewConflictError();
+
+      if (decision === "approved" && linkedUserId) {
+        const persisted = await persistIdentifiedUser(
+          {
+            siteId: site.siteId,
+            anonymousId: candidate.anonymousSubject,
+            userId: linkedUserId,
+            traits: candidate.traits,
+            identitySource: "resolved",
+          },
+          { database: tx, deferBackfill: true }
+        );
+        backfillRequired = persisted.backfillRequired;
+      }
+      const [review] = await tx
+        .insert(identityActivationReviews)
+        .values({
+          siteId: site.siteId,
+          candidateId: candidate.id,
+          reviewerId: request.user?.id ?? null,
+          decision,
+          crmStatus: null,
+          crmContactId: null,
+          sanitizedResult: {},
+        })
+        .returning({ id: identityActivationReviews.id });
+      if (decision === "suppressed" && site.id) {
+        await tx
+          .insert(identitySuppressions)
+          .values({
+            siteId: site.siteId,
+            suppressionKey: deriveScopedIdentityKey(site.id, "identity-suppression-v1", candidate.anonymousSubject),
+            reason: "reviewer_suppressed",
+          })
+          .onConflictDoNothing();
+      }
+      return review.id;
+    });
+  } catch (error) {
+    if (error instanceof CandidateReviewConflictError) {
+      return reply.status(409).send({ error: "Candidate has already been reviewed" });
+    }
+    throw error;
+  }
+
+  if (backfillRequired && linkedUserId) {
+    void backfillIdentifiedUserId(site.siteId, candidate.anonymousSubject, linkedUserId);
+  }
+  if (decision === "approved" && parsed.data.sendToCrm) {
+    crm = await sendCandidateToGhl({ siteId: site.siteId, traits: candidate.traits as any });
+    await db.transaction(async tx => {
+      await tx
+        .update(identityCandidates)
+        .set({ crmContactId: crm.contactId, updatedAt: new Date().toISOString() })
+        .where(eq(identityCandidates.id, candidate.id));
+      await tx
+        .update(identityActivationReviews)
+        .set({
+          crmStatus: crm.status,
+          crmContactId: crm.contactId,
+          sanitizedResult: { status: crm.status },
+        })
+        .where(eq(identityActivationReviews.id, reviewId));
+    });
+  }
   if (decision === "suppressed") {
     await identityResolutionService.queueProviderDeletions([candidate]);
   }
-  await db.transaction(async tx => {
-    await tx
-      .update(identityCandidates)
-      .set({ reviewStatus: decision, linkedUserId, crmContactId: crm.contactId, reviewedAt: now, updatedAt: now })
-      .where(eq(identityCandidates.id, candidate.id));
-    await tx.insert(identityActivationReviews).values({
-      siteId: site.siteId,
-      candidateId: candidate.id,
-      reviewerId: request.user?.id ?? null,
-      decision,
-      crmStatus: crm.status,
-      crmContactId: crm.contactId,
-      sanitizedResult: crm.status ? { status: crm.status } : {},
-    });
-    if (decision === "suppressed" && site.id) {
-      await tx
-        .insert(identitySuppressions)
-        .values({
-          siteId: site.siteId,
-          suppressionKey: deriveScopedIdentityKey(site.id, "identity-suppression-v1", candidate.anonymousSubject),
-          reason: "reviewer_suppressed",
-        })
-        .onConflictDoNothing();
-    }
-  });
   await audit(site, request.user?.id ?? null, `identity_candidate.${decision}`, candidate.id);
   return reply.send({ success: true, linkedUserId, crm });
 }

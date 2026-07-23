@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useExtracted } from "next-intl";
 import { KeyRound, ScanSearch, ShieldCheck } from "lucide-react";
 import {
@@ -26,6 +26,7 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
   const t = useExtracted();
   const [settings, setSettings] = useState<IdentitySettings | null>(null);
   const [resolution, setResolution] = useState<SiteResolutionSettings | null>(null);
+  const confirmedResolution = useRef<SiteResolutionSettings | null>(null);
   const [resolutionBlock, setResolutionBlock] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +36,7 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
       fetchResolutionSettings(siteId),
     ]);
     setSettings(identityResponse.settings);
+    confirmedResolution.current = resolutionResponse.settings;
     setResolution(resolutionResponse.settings);
     setResolutionBlock(resolutionResponse.complianceReason);
   };
@@ -79,10 +81,13 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
     setBusy(true);
     try {
       const response = await updateResolutionSettings(siteId, input);
+      confirmedResolution.current = response.settings;
       setResolution(response.settings);
       toast.success(t("Visitor resolution settings updated"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("Failed to update visitor resolution settings"));
+      setResolution(confirmedResolution.current);
+      await reload().catch(() => toast.error(t("Failed to reload visitor resolution settings")));
     } finally {
       setBusy(false);
     }
@@ -218,34 +223,47 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
               })
             }
           >
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="consumer">{t("Consumer / local")}</SelectItem>
               <SelectItem value="business">{t("B2B")}</SelectItem>
             </SelectContent>
           </Select>
         </SettingRow>
-        <SettingRow label={t("Shadow mode")} description={t("Store candidates for accuracy review without linking profiles")}>
+        <SettingRow
+          label={t("Shadow mode")}
+          description={t("Store candidates for accuracy review without linking profiles")}
+        >
           <Switch
             checked={resolution.shadowMode}
             disabled={disabled || busy}
             onCheckedChange={shadowMode => void patchResolution({ shadowMode })}
           />
         </SettingRow>
-        <SettingRow label={t("Resolution transport")} description={t("Use server API when available; pixel mode uses the SDM-owned connector")}>
+        <SettingRow
+          label={t("Resolution transport")}
+          description={t("Use server API when available; pixel mode uses the SDM-owned connector")}
+        >
           <Select
             value={resolution.transport}
             disabled={disabled || busy}
             onValueChange={transport => void patchResolution({ transport: transport as "server" | "pixel" })}
           >
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="server">{t("Server API")}</SelectItem>
               <SelectItem value="pixel">{t("SDM pixel bridge")}</SelectItem>
             </SelectContent>
           </Select>
         </SettingRow>
-        <SettingRow label={t("PDL enrichment")} description={t("Use PDL only for candidates above the enrichment threshold")}>
+        <SettingRow
+          label={t("PDL enrichment")}
+          description={t("Use PDL only for candidates above the enrichment threshold")}
+        >
           <Switch
             checked={resolution.enrichmentEnabled}
             disabled={disabled || busy}
@@ -254,7 +272,10 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
             }
           />
         </SettingRow>
-        <SettingRow label={t("Daily request cap")} description={t("Hard stop before another provider request is queued")}>
+        <SettingRow
+          label={t("Daily request cap")}
+          description={t("Hard stop before another provider request is queued")}
+        >
           <input
             type="number"
             min={0}

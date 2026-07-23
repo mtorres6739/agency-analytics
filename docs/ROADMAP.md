@@ -2,13 +2,13 @@
 
 ## Current status
 
-- M0 implementation complete locally; legal review remains an owner release gate.
-- M1 code foundation complete; staging deployment and browser QA remain.
-- M2 vertical slice complete with schema, APIs, UI, tracking verification, audit events, and tenant-isolation tests.
+- M0 product, technical, security, operations, wireframe, test, and OpenKnowledge foundations are complete. Provider contract and privacy approvals remain external activation gates.
+- M1 is live in production on Hetzner with the Preline agency shell, immutable-SHA releases, hardened Compose, backups, TOTP, Cloudflare edge controls, and browser smoke checks.
+- M2 is complete with schema, APIs, UI, tracking verification, audit events, tenant-isolation tests, and zero-touch managed tracking for supported Vercel and Cloudflare paths. Restrictive Vercel CSP is patched in the same preview-first change.
 - M3 client summary metrics are live in code; acquisition/content/GSC/Web Vitals portfolio aggregation and performance validation remain.
-- M4 reporting control plane is complete; workers, artifacts, signed downloads, and Resend delivery remain.
-- M5 requires provisioned Hetzner environments and pilot clients.
-- Managed tracking is available from client onboarding through tenant-scoped queued plan/apply/status/rollback APIs. Cloudflare-proxied origins can install and verify directly; supported Next.js and Vite Vercel/GitHub projects receive a preview PR. DNS-only WordPress remains gated on WP-CLI/SFTP or a managed connector.
+- M4 reporting is complete with BullMQ workers, private encrypted artifacts, signed downloads, retries, and Resend delivery.
+- M5 production is live. The three-site GA4 comparison, projected-load test, and first clean-environment restoration drill remain launch gates before broad client onboarding.
+- Provider-neutral identity is implemented on PR `#21`, disabled by default, and hardened against replay loss, retry cost inflation, pre-commit external side effects, failed consent withdrawal, and stale optimistic settings. No provider can activate before its contract, data-rights, deletion, health, and budget gates pass.
 
 ## M0: Foundation
 

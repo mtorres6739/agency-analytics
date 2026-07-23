@@ -17,25 +17,25 @@ const payloadSchema = z.object({
   result: z.unknown(),
 });
 
+type IdentityProviderWebhookRequest = FastifyRequest<{
+  Params: { provider: string };
+  Body: unknown;
+}>;
+
 function validSignature(rawBody: Buffer, timestamp: string, signature: string, secret: string) {
   const expected = createHmac("sha256", secret).update(timestamp).update(".").update(rawBody).digest();
   const received = Buffer.from(signature.replace(/^sha256=/, ""), "hex");
   return received.length === expected.length && timingSafeEqual(received, expected);
 }
 
-export async function handleIdentityProviderWebhook(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const provider = z
-    .enum(["customers_ai", "rb2b"])
-    .safeParse((request.params as { provider?: string } | undefined)?.provider);
+export async function handleIdentityProviderWebhook(request: IdentityProviderWebhookRequest, reply: FastifyReply) {
+  const provider = z.enum(["customers_ai", "rb2b"]).safeParse(request.params.provider);
   if (!provider.success) return reply.status(404).send({ error: "Provider not supported" });
-  const rawBody = (request as FastifyRequest & { rawBody?: Buffer }).rawBody;
+  const rawBody = request.rawBody;
   const timestamp = String(request.headers["x-identity-timestamp"] || "");
   const signature = String(request.headers["x-identity-signature"] || "");
   const secret = process.env[`${provider.data.toUpperCase()}_WEBHOOK_SECRET`]?.trim();
-  if (!rawBody || !secret || !timestamp || !signature) {
+  if (!Buffer.isBuffer(rawBody) || !secret || !timestamp || !signature) {
     return reply.status(401).send({ error: "Webhook signature is required" });
   }
   const timestampMs = Number(timestamp) * 1000;
@@ -55,39 +55,47 @@ export async function handleIdentityProviderWebhook(
     return reply.status(503).send({ error: "Webhook replay protection is unavailable" });
   }
   if (!inserted) return reply.send({ success: true, idempotent: true });
-  const config = await siteConfig.getConfig(parsed.data.site_id);
-  if (!config) return reply.status(404).send({ error: "Site not found" });
-  let correlation: { anonymousSubject: string; receiptId: string };
+  let accepted = false;
   try {
-    correlation = verifyCorrelationToken({
-      token: parsed.data.correlation_token,
-      expectedSitePublicId: parsed.data.site_id,
-    });
-  } catch {
-    return reply.status(401).send({ error: "Correlation token is invalid" });
-  }
-  const [consent] = await db
-    .select({ id: identityConsentReceipts.id })
-    .from(identityConsentReceipts)
-    .where(
-      and(
-        eq(identityConsentReceipts.id, correlation.receiptId),
-        eq(identityConsentReceipts.siteId, config.siteId),
-        eq(identityConsentReceipts.anonymousSubject, correlation.anonymousSubject),
-        eq(identityConsentReceipts.granted, true),
-        isNull(identityConsentReceipts.withdrawnAt)
+    const config = await siteConfig.getConfig(parsed.data.site_id);
+    if (!config) return reply.status(404).send({ error: "Site not found" });
+    let correlation: { anonymousSubject: string; receiptId: string };
+    try {
+      correlation = verifyCorrelationToken({
+        token: parsed.data.correlation_token,
+        expectedSitePublicId: parsed.data.site_id,
+      });
+    } catch {
+      return reply.status(401).send({ error: "Correlation token is invalid" });
+    }
+    const [consent] = await db
+      .select({ id: identityConsentReceipts.id })
+      .from(identityConsentReceipts)
+      .where(
+        and(
+          eq(identityConsentReceipts.id, correlation.receiptId),
+          eq(identityConsentReceipts.siteId, config.siteId),
+          eq(identityConsentReceipts.anonymousSubject, correlation.anonymousSubject),
+          eq(identityConsentReceipts.granted, true),
+          isNull(identityConsentReceipts.withdrawnAt)
+        )
       )
-    )
-    .limit(1);
-  if (!consent) return reply.status(403).send({ error: "Consent is not active" });
-  const normalized = normalizeProviderResponse(provider.data, parsed.data.result);
-  const result = await identityResolutionService.ingestWebhookCandidates({
-    siteId: config.siteId,
-    sitePublicId: parsed.data.site_id,
-    anonymousSubject: correlation.anonymousSubject,
-    provider: provider.data,
-    providerRequestId: normalized.requestId || parsed.data.event_id,
-    candidates: normalized.candidates,
-  });
-  return reply.status(result.accepted ? 202 : 403).send({ success: result.accepted, ...result });
+      .limit(1);
+    if (!consent) return reply.status(403).send({ error: "Consent is not active" });
+    const normalized = normalizeProviderResponse(provider.data, parsed.data.result);
+    const result = await identityResolutionService.ingestWebhookCandidates({
+      siteId: config.siteId,
+      sitePublicId: parsed.data.site_id,
+      anonymousSubject: correlation.anonymousSubject,
+      provider: provider.data,
+      providerRequestId: normalized.requestId || parsed.data.event_id,
+      candidates: normalized.candidates,
+    });
+    accepted = result.accepted;
+    return reply.status(accepted ? 202 : 403).send({ success: accepted, ...result });
+  } finally {
+    if (!accepted) {
+      await redis.del(replayKey).catch(() => undefined);
+    }
+  }
 }

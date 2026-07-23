@@ -84,6 +84,10 @@ The identity kill switch applies to every identity source, including dashboard-i
 
 A scoped Cloudflare deployment token covering the 49 active zones present on 2026-07-19 is stored in the local macOS Keychain, not in the repository. The edge planner correctly blocks DNS-only Vercel domains; those projects use the Vercel/GitHub preview-PR adapter instead.
 
+Provider-neutral visitor identity is implemented on PR `#21` and remains disabled by default. The branch is rebased onto production release `dfb4f48a17de06aa3776677b3112fce33713f9d1`. Review hardening makes accepted webhook replay markers durable while releasing rejected attempts, keeps failed consent withdrawals retryable, caches public tracker identity configuration, commits candidate/profile/suppression state before CRM or provider-deletion side effects, and records provider usage once per logical BullMQ attempt. The client rolls failed budget edits back to the last confirmed server state. Next.js is pinned to patched `16.2.11`; production dependency audits for both client and server report zero vulnerabilities after tested transitive overrides.
+
+No CustomersAI, RB2B, or PDL credentials may be added until the provider supplies approved sandbox schemas, webhook and deletion details, a DPA and subprocessor list, written multi-client display/storage/export/deletion rights, and pricing within the $750 monthly pilot cap. Palm Squad remains the first consumer shadow pilot after those gates pass; provider-derived candidates must not route to GHL or trigger outreach automatically.
+
 ## Knowledge rule
 
 Store how this fork works in this wiki. Promote only reusable self-hosting, analytics, security, or agent-workflow patterns to the master Knowledge OS.

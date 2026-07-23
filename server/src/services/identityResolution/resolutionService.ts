@@ -57,15 +57,20 @@ function utcDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function addUsage(input: {
-  siteId: number;
-  provider: IdentityProvider | "pdl";
-  matched: boolean;
-  failed: boolean;
-  latencyMs: number;
-  costMicros: number;
-}) {
-  await db
+type UsageDatabase = Pick<typeof db, "insert">;
+
+async function addUsage(
+  input: {
+    siteId: number;
+    provider: IdentityProvider | "pdl";
+    matched: boolean;
+    failed: boolean;
+    latencyMs: number;
+    costMicros: number;
+  },
+  database: UsageDatabase = db
+) {
+  await database
     .insert(identityProviderUsage)
     .values({
       siteId: input.siteId,
@@ -88,6 +93,37 @@ async function addUsage(input: {
         updatedAt: sql`now()`,
       },
     });
+}
+
+type UsageOutcome = Parameters<typeof addUsage>[0];
+
+async function recordAttemptOutcome(input: {
+  attemptId: string;
+  status: "matched" | "no_match" | "failed";
+  confidence?: number;
+  rejectionCode?: string;
+  providerUsage: UsageOutcome;
+  enrichmentUsage?: UsageOutcome | null;
+}) {
+  return db.transaction(async tx => {
+    const [claimed] = await tx
+      .update(identityResolutionAttempts)
+      .set({
+        status: input.status,
+        confidence: input.confidence,
+        rejectionCode: input.rejectionCode,
+        estimatedCostMicros: input.providerUsage.costMicros,
+        completedAt: new Date().toISOString(),
+      })
+      .where(and(eq(identityResolutionAttempts.id, input.attemptId), eq(identityResolutionAttempts.status, "queued")))
+      .returning({ id: identityResolutionAttempts.id });
+    if (!claimed) return false;
+    await addUsage(input.providerUsage, tx);
+    if (input.enrichmentUsage) {
+      await addUsage(input.enrichmentUsage, tx);
+    }
+    return true;
+  });
 }
 
 async function reserveBudget(input: {
@@ -576,6 +612,7 @@ class IdentityResolutionService {
       enrichmentConnection.lastHealthStatus === "healthy" &&
       enrichmentConnection.capabilities.includes("enrich");
     const started = Date.now();
+    let enrichmentUsage: UsageOutcome | null = null;
     try {
       const candidates = await resolvers[provider].resolve({
         siteId: context.siteId,
@@ -600,23 +637,23 @@ class IdentityResolutionService {
           try {
             const enrichment = await pdlEnrichmentProvider.enrich(candidate.traits);
             candidate = mergeEnrichment(candidate, enrichment);
-            await addUsage({
+            enrichmentUsage = {
               siteId: context.siteId,
               provider: "pdl",
               matched: Boolean(enrichment),
               failed: false,
               latencyMs: Date.now() - enrichStarted,
               costMicros: Number(process.env.PDL_COST_MICROS || 0),
-            });
+            };
           } catch (error) {
-            await addUsage({
+            enrichmentUsage = {
               siteId: context.siteId,
               provider: "pdl",
               matched: false,
               failed: true,
               latencyMs: Date.now() - enrichStarted,
               costMicros: 0,
-            });
+            };
             this.logger.warn({ siteId: context.siteId, errorName: safeFailure(error) }, "Optional enrichment failed");
           }
         }
@@ -673,36 +710,39 @@ class IdentityResolutionService {
           });
         }
       }
-      await addUsage({
-        siteId: context.siteId,
-        provider,
-        matched: candidates.length > 0,
-        failed: false,
-        latencyMs: Date.now() - started,
-        costMicros,
+      await recordAttemptOutcome({
+        attemptId: job.data.attemptId,
+        status: candidates.length ? "matched" : "no_match",
+        confidence: candidates[0]?.confidence,
+        providerUsage: {
+          siteId: context.siteId,
+          provider,
+          matched: candidates.length > 0,
+          failed: false,
+          latencyMs: Date.now() - started,
+          costMicros,
+        },
+        enrichmentUsage,
       });
-      await db
-        .update(identityResolutionAttempts)
-        .set({
-          status: candidates.length ? "matched" : "no_match",
-          confidence: candidates[0]?.confidence,
-          estimatedCostMicros: costMicros,
-          completedAt: new Date().toISOString(),
-        })
-        .where(eq(identityResolutionAttempts.id, job.data.attemptId));
     } catch (error) {
-      await addUsage({
-        siteId: context.siteId,
-        provider,
-        matched: false,
-        failed: true,
-        latencyMs: Date.now() - started,
-        costMicros: 0,
-      });
-      await db
-        .update(identityResolutionAttempts)
-        .set({ status: "failed", rejectionCode: safeFailure(error), completedAt: new Date().toISOString() })
-        .where(eq(identityResolutionAttempts.id, job.data.attemptId));
+      const attemptsAllowed = typeof job.opts.attempts === "number" ? job.opts.attempts : 1;
+      const terminalFailure = job.attemptsMade + 1 >= attemptsAllowed;
+      if (terminalFailure) {
+        await recordAttemptOutcome({
+          attemptId: job.data.attemptId,
+          status: "failed",
+          rejectionCode: safeFailure(error),
+          providerUsage: {
+            siteId: context.siteId,
+            provider,
+            matched: false,
+            failed: true,
+            latencyMs: Date.now() - started,
+            costMicros: 0,
+          },
+          enrichmentUsage,
+        });
+      }
       throw error;
     }
   }

@@ -41,6 +41,17 @@ const identifyPayloadSchema = z.object({
 // Anonymous events older than this are unlikely to belong to the identifying user.
 const BACKFILL_DAYS = 30;
 
+type IdentityPersistenceDatabase = Pick<typeof db, "insert" | "select" | "update">;
+
+type PersistIdentifiedUserInput = {
+  siteId: number;
+  anonymousId: string;
+  userId: string;
+  traits?: Record<string, unknown>;
+  isNewIdentify?: boolean;
+  identitySource?: "direct" | "verified" | "dashboard" | "resolved";
+};
+
 // days: null backfills the device's full history — only for explicit admin
 // actions (dashboard identify), where the operator asserts the whole history
 // belongs to this user and the unbounded partition scan is a one-off.
@@ -73,35 +84,33 @@ export async function backfillIdentifiedUserId(
   }
 }
 
-export async function persistIdentifiedUser(input: {
-  siteId: number;
-  anonymousId: string;
-  userId: string;
-  traits?: Record<string, unknown>;
-  isNewIdentify?: boolean;
-  identitySource?: "direct" | "verified" | "dashboard" | "resolved";
-}) {
+export async function persistIdentifiedUser(
+  input: PersistIdentifiedUserInput,
+  options: { database?: IdentityPersistenceDatabase; deferBackfill?: boolean } = {}
+) {
+  const database = options.database ?? db;
   const { siteId, anonymousId, userId, traits, isNewIdentify = true, identitySource = "direct" } = input;
   const identifiedAt = new Date().toISOString();
+  let backfillRequired = false;
   if (isNewIdentify) {
-    await db
+    await database
       .insert(userProfiles)
       .values({ siteId, userId, identitySource, lastIdentifiedAt: identifiedAt })
       .onConflictDoUpdate({
         target: [userProfiles.siteId, userProfiles.userId],
         set: { identitySource, lastIdentifiedAt: identifiedAt, updatedAt: sql`now()` },
       });
-    const [existingAlias] = await db
+    const [existingAlias] = await database
       .select()
       .from(userAliases)
       .where(and(eq(userAliases.siteId, siteId), eq(userAliases.anonymousId, anonymousId)))
       .limit(1);
 
     if (!existingAlias) {
-      await db.insert(userAliases).values({ siteId, anonymousId, userId }).onConflictDoNothing();
-      void backfillIdentifiedUserId(siteId, anonymousId, userId);
+      await database.insert(userAliases).values({ siteId, anonymousId, userId }).onConflictDoNothing();
+      backfillRequired = true;
     } else if (existingAlias.userId !== userId) {
-      await db
+      await database
         .update(userAliases)
         .set({ userId })
         .where(and(eq(userAliases.siteId, siteId), eq(userAliases.anonymousId, anonymousId)));
@@ -118,7 +127,7 @@ export async function persistIdentifiedUser(input: {
         ? sql`(${userProfiles.traits} - ${nullKeys}::text[]) || ${JSON.stringify(filteredTraits)}::jsonb`
         : sql`${userProfiles.traits} || ${JSON.stringify(filteredTraits)}::jsonb`;
 
-    await db
+    await database
       .insert(userProfiles)
       .values({ siteId, userId, traits: filteredTraits, identitySource, lastIdentifiedAt: identifiedAt })
       .onConflictDoUpdate({
@@ -126,6 +135,10 @@ export async function persistIdentifiedUser(input: {
         set: { traits: traitsExpr, identitySource, lastIdentifiedAt: identifiedAt, updatedAt: sql`now()` },
       });
   }
+  if (backfillRequired && !options.deferBackfill) {
+    void backfillIdentifiedUserId(siteId, anonymousId, userId);
+  }
+  return { backfillRequired };
 }
 
 export async function handleIdentify(request: FastifyRequest, reply: FastifyReply) {

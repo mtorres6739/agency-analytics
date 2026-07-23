@@ -141,7 +141,11 @@ export function deriveScopedIdentityKey(sitePublicId: string, purpose: string, v
   return createHmac("sha256", derivedKeyFromEnvironment(sitePublicId, purpose)).update(normalized).digest("base64url");
 }
 
-function derivedKeyFromEnvironment(sitePublicId: string, purpose: string, env: NodeJS.ProcessEnv = process.env): Buffer {
+function derivedKeyFromEnvironment(
+  sitePublicId: string,
+  purpose: string,
+  env: NodeJS.ProcessEnv = process.env
+): Buffer {
   const configured = env.IDENTITY_KEY_ENCRYPTION_SECRET?.trim();
   if (!configured || configured.length < 32) {
     throw new IdentityCryptoError(
@@ -152,14 +156,20 @@ function derivedKeyFromEnvironment(sitePublicId: string, purpose: string, env: N
   return Buffer.from(hkdfSync("sha256", Buffer.from(configured), Buffer.from(sitePublicId), Buffer.from(purpose), 32));
 }
 
-export function encryptResolutionEnvelope(value: Record<string, unknown>, env: NodeJS.ProcessEnv = process.env): string {
+export function encryptResolutionEnvelope(
+  value: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env
+): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", encryptionKey(env), iv);
   const encrypted = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
   return [iv, cipher.getAuthTag(), encrypted].map(part => part.toString("base64url")).join(".");
 }
 
-export function decryptResolutionEnvelope(value: string, env: NodeJS.ProcessEnv = process.env): Record<string, unknown> {
+export function decryptResolutionEnvelope(
+  value: string,
+  env: NodeJS.ProcessEnv = process.env
+): Record<string, unknown> {
   try {
     const [iv, tag, encrypted, extra] = value.split(".");
     if (!iv || !tag || !encrypted || extra) throw new Error("Malformed envelope");
@@ -192,11 +202,10 @@ export function createCorrelationToken(input: {
   return `${payload}.${signature}`;
 }
 
-export function verifyCorrelationToken(input: {
-  token: string;
-  expectedSitePublicId: string;
-  nowSeconds?: number;
-}): { anonymousSubject: string; receiptId: string } {
+export function verifyCorrelationToken(input: { token: string; expectedSitePublicId: string; nowSeconds?: number }): {
+  anonymousSubject: string;
+  receiptId: string;
+} {
   const [payload, signature, extra] = input.token.split(".");
   if (!payload || !signature || extra) {
     throw new IdentityCryptoError("Correlation token is malformed", "INVALID_ASSERTION");
@@ -227,7 +236,10 @@ export function verifyCorrelationToken(input: {
     })
     .safeParse(claims);
   const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
-  if (!parsed.success || parsed.data.exp < now) {
+  if (!parsed.success) {
+    throw new IdentityCryptoError("Correlation token is invalid", "INVALID_ASSERTION");
+  }
+  if (parsed.data.exp < now) {
     throw new IdentityCryptoError("Correlation token has expired", "EXPIRED_ASSERTION");
   }
   return { anonymousSubject: parsed.data.sub, receiptId: parsed.data.receipt };
@@ -261,10 +273,7 @@ export function verifyConsentWithdrawalToken(input: {
   if (!payload || !signature || extra) {
     throw new IdentityCryptoError("Withdrawal token is malformed", "INVALID_ASSERTION");
   }
-  const expected = createHmac(
-    "sha256",
-    derivedKeyFromEnvironment(input.expectedSitePublicId, "consent-withdrawal-v1")
-  )
+  const expected = createHmac("sha256", derivedKeyFromEnvironment(input.expectedSitePublicId, "consent-withdrawal-v1"))
     .update(payload)
     .digest();
   const received = Buffer.from(signature, "base64url");
@@ -287,7 +296,10 @@ export function verifyConsentWithdrawalToken(input: {
     })
     .safeParse(claims);
   const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
-  if (!parsed.success || parsed.data.exp < now) {
+  if (!parsed.success) {
+    throw new IdentityCryptoError("Withdrawal token is invalid", "INVALID_ASSERTION");
+  }
+  if (parsed.data.exp < now) {
     throw new IdentityCryptoError("Withdrawal token has expired", "EXPIRED_ASSERTION");
   }
   return { anonymousSubject: parsed.data.sub, receiptId: parsed.data.receipt };

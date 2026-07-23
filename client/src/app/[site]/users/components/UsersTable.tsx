@@ -250,7 +250,9 @@ export function UsersTable() {
           columnHelper.display({
             id: "title",
             header: t("Title"),
-            cell: info => <span className="block max-w-40 truncate">{String(info.row.original.traits?.title ?? "—")}</span>,
+            cell: info => (
+              <span className="block max-w-40 truncate">{String(info.row.original.traits?.title ?? "—")}</span>
+            ),
           }),
         ]
       : []),
@@ -261,7 +263,13 @@ export function UsersTable() {
             header: t("LinkedIn"),
             cell: info => {
               const url = info.row.original.traits?.linkedinUrl;
-              return typeof url === "string" ? <a href={url} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">Profile</a> : "—";
+              return typeof url === "string" ? (
+                <a href={url} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">
+                  {t("Profile")}
+                </a>
+              ) : (
+                "—"
+              );
             },
           }),
         ]

@@ -1,9 +1,18 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { siteConfig } from "../../lib/siteConfig.js";
 import { usageService } from "../../services/usageService.js";
-import { db } from "../../db/postgres/postgres.js";
-import { siteResolutionSettings } from "../../db/postgres/schema.js";
-import { eq } from "drizzle-orm";
+
+const configuredConnectorUrl = process.env.IDENTITY_CONNECTOR_URL?.trim();
+let connectorUrl: string | null = null;
+if (configuredConnectorUrl && process.env.BASE_URL) {
+  try {
+    if (new URL(configuredConnectorUrl).origin === new URL(process.env.BASE_URL).origin) {
+      connectorUrl = configuredConnectorUrl;
+    }
+  } catch {
+    connectorUrl = null;
+  }
+}
 
 export async function getTrackingConfig(request: FastifyRequest<{ Params: { siteId: string } }>, reply: FastifyReply) {
   try {
@@ -20,31 +29,15 @@ export async function getTrackingConfig(request: FastifyRequest<{ Params: { site
       config.type === "mobile"
         ? false
         : (config.sessionReplay && !usageService.isSiteWithoutReplay(config.siteId)) || false;
-    const [resolution] = await db
-      .select({
-        enabled: siteResolutionSettings.enabled,
-        complianceState: siteResolutionSettings.complianceState,
-        policyVersion: siteResolutionSettings.policyVersion,
-        primaryProvider: siteResolutionSettings.primaryProvider,
-        transport: siteResolutionSettings.transport,
-      })
-      .from(siteResolutionSettings)
-      .where(eq(siteResolutionSettings.siteId, config.siteId))
-      .limit(1);
-
     // Return tracking configuration
     // This endpoint is public since the analytics script needs to fetch it
-    const configuredConnectorUrl = process.env.IDENTITY_CONNECTOR_URL?.trim();
-    let connectorUrl: string | null = null;
-    if (configuredConnectorUrl && process.env.BASE_URL) {
-      try {
-        if (new URL(configuredConnectorUrl).origin === new URL(process.env.BASE_URL).origin) {
-          connectorUrl = configuredConnectorUrl;
-        }
-      } catch {
-        connectorUrl = null;
-      }
-    }
+    const resolution = config.identityResolution ?? {
+      enabled: false,
+      complianceState: "pending",
+      policyVersion: "identity-v1",
+      primaryProvider: "customers_ai",
+      transport: "server",
+    };
     return reply.send({
       type: config.type,
       sessionReplay,
@@ -58,9 +51,9 @@ export async function getTrackingConfig(request: FastifyRequest<{ Params: { site
       trackCopy: config.trackCopy || false,
       trackFormInteractions: config.trackFormInteractions || false,
       identityResolution: {
-        enabled: resolution?.enabled === true && resolution.complianceState === "approved",
-        policyVersion: resolution?.policyVersion ?? "identity-v1",
-        connectorUrl: resolution?.transport === "pixel" ? connectorUrl : null,
+        enabled: resolution.enabled && resolution.complianceState === "approved",
+        policyVersion: resolution.policyVersion,
+        connectorUrl: resolution.transport === "pixel" ? connectorUrl : null,
       },
     });
   } catch (error) {

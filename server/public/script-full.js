@@ -1633,8 +1633,12 @@
         credentials: "omit",
         mode: "cors"
       }).catch(() => null);
-      this.write("denied");
-      return response?.ok === true;
+      const withdrawn = response?.ok === true;
+      if (withdrawn) {
+        this.write("denied");
+        this.removeBanner();
+      }
+      return withdrawn;
     }
     removeBanner() {
       this.banner?.remove();

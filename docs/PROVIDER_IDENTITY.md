@@ -93,7 +93,7 @@ Public tracker API:
 - `POST /api/identity/withdraw`
 - `POST /api/identity/provider-webhooks/:provider`
 
-Webhook signatures use `X-Identity-Timestamp` and `X-Identity-Signature`, where the signature is the hex HMAC-SHA256 of `<unix timestamp>.<raw request body>`. The allowed clock skew is five minutes. Redis rejects replayed event IDs for 24 hours. The signed correlation token binds the event to one site, consent receipt, anonymous subject, and short expiration.
+Webhook signatures use `X-Identity-Timestamp` and `X-Identity-Signature`, where the signature is the hex HMAC-SHA256 of `<unix timestamp>.<raw request body>`. The allowed clock skew is five minutes. Redis rejects successfully accepted replayed event IDs for 24 hours. Validation, inactive-consent, and disabled-ingestion rejections release the in-flight marker so a corrected provider retry is not silently discarded. The signed correlation token binds the event to one site, consent receipt, anonymous subject, and short expiration.
 
 ## Review, scoring, and CRM
 
@@ -105,9 +105,11 @@ MCP adds separately scoped `identity:read` and `identity:write` tools for candid
 
 ## Withdrawal and retention
 
-Withdrawal revokes active receipts, deletes candidates, aliases, resolved profiles, and associated analytics/replay rows, then creates a non-reversible site-scoped suppression HMAC. Sanitized activation audit records remain after their candidate is deleted. Candidate records expire after 30 days. Resolution attempts, inactive consent proof, and usage data expire after 395 days. Suppression hashes remain so a deleted person is not re-identified.
+Withdrawal revokes active receipts, deletes candidates, aliases, resolved profiles, and associated analytics/replay rows, then creates a non-reversible site-scoped suppression HMAC. Local deletion commits before provider deletion is queued, so a failed database transaction cannot delete the provider subject while retaining the local profile. Sanitized activation audit records remain after their candidate is deleted. Candidate records expire after 30 days. Resolution attempts, inactive consent proof, and usage data follow each site's configured identity retention period. Suppression hashes remain so a deleted person is not re-identified.
 
 Provider-side deletion uses an encrypted subject reference and a dedicated retry queue. Approval and health checks fail closed unless the provider's documented deletion endpoint is configured. The endpoint must be contract-tested with the provider sandbox before a site can leave shadow mode; until then the adapter stays disabled.
+
+Provider usage is finalized once per logical resolution attempt. Transient BullMQ retries remain `queued` and do not increment aggregate request, failure, enrichment, or cost totals; the terminal success or failure claims the attempt and usage rows in one transaction.
 
 ## Pilot
 
