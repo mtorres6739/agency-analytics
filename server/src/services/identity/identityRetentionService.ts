@@ -48,6 +48,11 @@ class IdentityRetentionService {
         WHERE u.site_id = s.site_id
           AND u.usage_date::date < current_date - s.retention_days
       `),
+      db.execute(sql`
+        DELETE FROM identity_provider_deletion_outbox
+        WHERE status = 'completed'
+          AND completed_at < now() - interval '30 days'
+      `),
     ]);
     if (count > 0) this.logger.info({ count }, "Expired identified profiles deleted");
     return count;
@@ -60,6 +65,11 @@ class IdentityRetentionService {
       () => void this.run().catch(error => this.logger.error({ error }, "Identity retention job failed")),
       { timezone: "UTC" }
     );
+  }
+
+  stop() {
+    this.task?.stop();
+    this.task = null;
   }
 }
 

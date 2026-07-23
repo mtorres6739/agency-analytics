@@ -183,7 +183,10 @@ class SiteConfig {
     this.cache.clear();
   }
 
-  async updateConfig(siteIdOrId: number | string, config: Partial<SiteConfigData>): Promise<void> {
+  async updateConfig(
+    siteIdOrId: number | string,
+    config: Partial<Omit<SiteConfigData, "identityResolution">>
+  ): Promise<void> {
     try {
       const isNumeric = this.isNumericId(siteIdOrId);
       await db

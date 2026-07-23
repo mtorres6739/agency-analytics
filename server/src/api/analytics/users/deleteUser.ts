@@ -55,6 +55,7 @@ export async function deleteUser(req: FastifyRequest<DeleteUserRequest>, res: Fa
     const providerCandidates = await db
       .select({
         id: identityCandidates.id,
+        siteId: identityCandidates.siteId,
         provider: identityCandidates.provider,
         providerSubjectRef: identityCandidates.providerSubjectRef,
       })
@@ -98,47 +99,50 @@ export async function deleteUser(req: FastifyRequest<DeleteUserRequest>, res: Fa
       )
     );
 
-    await identityResolutionService.queueProviderDeletions(providerCandidates);
-
-    await Promise.all([
-      db.delete(userProfiles).where(and(eq(userProfiles.siteId, siteId), eq(userProfiles.userId, userId))),
-      db
+    let deletionOutboxIds: string[] = [];
+    await db.transaction(async tx => {
+      deletionOutboxIds = (await identityResolutionService.stageProviderDeletions(providerCandidates, tx)).map(
+        record => record.id
+      );
+      await tx.delete(userProfiles).where(and(eq(userProfiles.siteId, siteId), eq(userProfiles.userId, userId)));
+      await tx
         .delete(userAliases)
         .where(
           and(eq(userAliases.siteId, siteId), or(eq(userAliases.userId, userId), eq(userAliases.anonymousId, userId)))
-        ),
-      db.delete(identityCandidates).where(candidateCondition),
-      db
+        );
+      await tx.delete(identityCandidates).where(candidateCondition);
+      await tx
         .delete(identityResolutionAttempts)
         .where(
           and(
             eq(identityResolutionAttempts.siteId, siteId),
             or(...deviceIds.map(id => eq(identityResolutionAttempts.anonymousSubject, id)))
           )
-        ),
-      db
+        );
+      await tx
         .delete(identityConsentReceipts)
         .where(
           and(
             eq(identityConsentReceipts.siteId, siteId),
             or(...deviceIds.map(id => eq(identityConsentReceipts.anonymousSubject, id)))
           )
-        ),
-    ]);
+        );
 
-    if (site?.publicId) {
-      const publicSiteId = site.publicId;
-      await db
-        .insert(identitySuppressions)
-        .values(
-          deviceIds.map(id => ({
-            siteId,
-            suppressionKey: deriveScopedIdentityKey(publicSiteId, "identity-suppression-v1", id),
-            reason: "deleted",
-          }))
-        )
-        .onConflictDoNothing();
-    }
+      if (site?.publicId) {
+        const publicSiteId = site.publicId;
+        await tx
+          .insert(identitySuppressions)
+          .values(
+            deviceIds.map(id => ({
+              siteId,
+              suppressionKey: deriveScopedIdentityKey(publicSiteId, "identity-suppression-v1", id),
+              reason: "deleted",
+            }))
+          )
+          .onConflictDoNothing();
+      }
+    });
+    await identityResolutionService.dispatchProviderDeletions(deletionOutboxIds);
 
     await auditSiteIdentityEvent({
       siteId,

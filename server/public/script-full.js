@@ -1536,7 +1536,12 @@
   var IdentityConsentManager = class {
     constructor(config) {
       this.config = config;
-      this.storageKey = `${config.namespace}-identity-consent`;
+      let analyticsOrigin = "invalid-origin";
+      try {
+        analyticsOrigin = new URL(config.analyticsHost).origin;
+      } catch {
+      }
+      this.storageKey = `${config.namespace}-identity-consent:${encodeURIComponent(analyticsOrigin)}:${config.siteId}`;
     }
     gpcEnabled() {
       return navigator.globalPrivacyControl === true;
@@ -1549,12 +1554,13 @@
         return null;
       }
     }
-    write(status, withdrawalToken) {
+    write(status, withdrawalToken, revocationPending = false) {
       const state = {
         status,
         gpc: this.gpcEnabled(),
         policyVersion: this.config.identityPolicyVersion || "identity-v1",
-        withdrawalToken
+        withdrawalToken,
+        revocationPending
       };
       try {
         localStorage.setItem(this.storageKey, JSON.stringify(state));
@@ -1575,12 +1581,28 @@
         credentials: "omit",
         mode: "cors"
       });
-      if (!response.ok) return { ok: false, correlationToken: void 0 };
+      if (!response.ok)
+        return {
+          ok: false,
+          granted: false,
+          correlationToken: void 0,
+          withdrawalToken: void 0
+        };
       const result = await response.json?.().catch(() => ({}));
-      return { ok: true, correlationToken: result?.correlationToken, withdrawalToken: result?.withdrawalToken };
+      return {
+        ok: result?.success === true,
+        granted: result?.granted === true,
+        correlationToken: result?.correlationToken,
+        withdrawalToken: result?.withdrawalToken
+      };
     }
     loadConnector(correlationToken) {
-      if (!correlationToken || !this.config.identityConnectorUrl) return;
+      if (!this.config.identityResolutionEnabled || !correlationToken || !this.config.identityConnectorUrl) return;
+      try {
+        if (new URL(this.config.identityConnectorUrl).origin !== new URL(this.config.analyticsHost).origin) return;
+      } catch {
+        return;
+      }
       if (document.querySelector(`script[data-rybbit-identity-connector="${this.config.siteId}"]`)) return;
       const script = document.createElement("script");
       script.src = this.config.identityConnectorUrl;
@@ -1591,13 +1613,24 @@
       document.head.appendChild(script);
     }
     async initialize() {
+      const stored = this.read();
+      if (stored?.revocationPending && stored.withdrawalToken) {
+        await this.withdraw();
+        return;
+      }
       if (!this.config.identityResolutionEnabled) return;
       if (this.gpcEnabled()) {
         this.write("denied");
         await this.send(false, true).catch(() => ({ ok: false }));
         return;
       }
-      if (this.read()) return;
+      if (stored) return;
+      if (!document.body) {
+        await new Promise((resolve) => {
+          document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+        });
+      }
+      if (!document.body || this.read()) return;
       this.renderBanner();
     }
     getState() {
@@ -1605,18 +1638,20 @@
       return stored ?? { status: "unknown", gpc: this.gpcEnabled() };
     }
     async grant() {
-      if (this.gpcEnabled()) return false;
+      if (!this.config.identityResolutionEnabled || this.gpcEnabled()) return false;
       const result = await this.send(true, false).catch(() => ({
         ok: false,
+        granted: false,
         correlationToken: void 0,
         withdrawalToken: void 0
       }));
-      if (result.ok) {
+      if (result.ok && result.granted && result.withdrawalToken) {
         this.write("granted", result.withdrawalToken);
         this.removeBanner();
         this.loadConnector(result.correlationToken);
+        return true;
       }
-      return result.ok;
+      return false;
     }
     async reject() {
       const result = await this.send(false).catch(() => ({ ok: false }));
@@ -1626,6 +1661,14 @@
     }
     async withdraw() {
       const stored = this.read();
+      if (!stored?.withdrawalToken) {
+        this.write("denied");
+        this.removeBanner();
+        return false;
+      }
+      this.write("denied", stored.withdrawalToken, true);
+      this.removeBanner();
+      document.querySelector(`script[data-rybbit-identity-connector="${this.config.siteId}"]`)?.remove();
       const response = await fetch(`${this.config.analyticsHost}/identity/withdraw`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1633,10 +1676,10 @@
         credentials: "omit",
         mode: "cors"
       }).catch(() => null);
-      const withdrawn = response?.ok === true;
+      const result = response?.ok ? await response.json?.().catch(() => null) : null;
+      const withdrawn = result?.success === true && result.suppressed === true;
       if (withdrawn) {
         this.write("denied");
-        this.removeBanner();
       }
       return withdrawn;
     }

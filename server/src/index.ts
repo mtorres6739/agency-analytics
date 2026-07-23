@@ -822,6 +822,7 @@ const shutdown = async (signal: string) => {
     await agencyReportService.shutdown();
     await trackingDeploymentService.shutdown();
     await identityResolutionService.shutdown();
+    identityRetentionService.stop();
 
     // Shutdown uptime service
     // await uptimeService.shutdown();

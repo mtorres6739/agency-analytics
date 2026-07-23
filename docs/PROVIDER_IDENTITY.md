@@ -55,8 +55,8 @@ Exact vendor URLs are configuration, not source defaults. Set them only from the
 - `CUSTOMERS_AI_RESOLVE_URL`, `CUSTOMERS_AI_HEALTH_URL`, `CUSTOMERS_AI_DELETE_URL`, `CUSTOMERS_AI_API_KEY`, `CUSTOMERS_AI_WEBHOOK_SECRET`
 - `RB2B_RESOLVE_URL`, `RB2B_HEALTH_URL`, `RB2B_DELETE_URL`, `RB2B_API_KEY`, `RB2B_WEBHOOK_SECRET`
 - `PDL_ENRICH_URL`, `PDL_API_KEY`
-- Per-request cost ledger inputs: `CUSTOMERS_AI_COST_MICROS`, `RB2B_COST_MICROS`, `PDL_COST_MICROS`
-- Organization pilot cap: `IDENTITY_PILOT_MONTHLY_BUDGET_CENTS`, hard-limited to $750. Atomic Redis reservations enforce both site and organization caps before a provider token or job is issued.
+- Required positive per-request cost ledger inputs: `CUSTOMERS_AI_COST_MICROS`, `RB2B_COST_MICROS`, `PDL_COST_MICROS`. Missing, zero, fractional, or non-finite pricing fails closed before provider approval, activation, or network access.
+- Organization pilot cap: `IDENTITY_PILOT_MONTHLY_BUDGET_CENTS`, validated as a finite integer from $0 through $750. Invalid or excessive values fail closed. Atomic Redis reservations enforce both site and organization caps before a provider token or job is issued.
 - Optional SDM-owned pixel bridge: `IDENTITY_CONNECTOR_URL`. It must share the analytics application's origin and loads only after consent.
 
 ## Activation gates
@@ -105,9 +105,9 @@ MCP adds separately scoped `identity:read` and `identity:write` tools for candid
 
 ## Withdrawal and retention
 
-Withdrawal revokes active receipts, deletes candidates, aliases, resolved profiles, and associated analytics/replay rows, then creates a non-reversible site-scoped suppression HMAC. Local deletion commits before provider deletion is queued, so a failed database transaction cannot delete the provider subject while retaining the local profile. Sanitized activation audit records remain after their candidate is deleted. Candidate records expire after 30 days. Resolution attempts, inactive consent proof, and usage data follow each site's configured identity retention period. Suppression hashes remain so a deleted person is not re-identified.
+Withdrawal revokes active receipts, deletes candidates, aliases, resolved profiles, and associated analytics/replay rows, then creates a non-reversible site-scoped suppression HMAC. The same Postgres transaction writes an encrypted provider-deletion outbox record before local candidate data is removed. A queue outage or process crash therefore cannot lose the provider deletion request, and a failed database transaction cannot contact the provider while retaining the local profile. Sanitized activation audit records remain after their candidate is deleted. Candidate records expire after 30 days. Resolution attempts, inactive consent proof, and usage data follow each site's configured identity retention period. Suppression hashes remain so a deleted person is not re-identified.
 
-Provider-side deletion uses an encrypted subject reference and a dedicated retry queue. Approval and health checks fail closed unless the provider's documented deletion endpoint is configured. The endpoint must be contract-tested with the provider sandbox before a site can leave shadow mode; until then the adapter stays disabled.
+Provider-side deletion uses an encrypted subject reference, transactional outbox, periodic pending-record dispatcher, and dedicated retry queue. The outbox is marked complete only after the provider accepts deletion; terminal failures remain durable for operator recovery. Approval and health checks fail closed unless the provider's documented deletion endpoint is configured. The endpoint must be contract-tested with the provider sandbox before a site can leave shadow mode; until then the adapter stays disabled.
 
 Provider usage is finalized once per logical resolution attempt. Transient BullMQ retries remain `queued` and do not increment aggregate request, failure, enrichment, or cost totals; the terminal success or failure claims the attempt and usage rows in one transaction.
 

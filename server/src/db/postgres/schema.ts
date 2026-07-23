@@ -1339,6 +1339,35 @@ export const identityProviderUsage = pgTable(
   ]
 );
 
+// Transactional outbox for privacy deletion requests. The encrypted provider
+// reference remains durable even after the local candidate/profile is removed.
+export const identityProviderDeletionOutbox = pgTable(
+  "identity_provider_deletion_outbox",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    siteId: integer("site_id").notNull(),
+    candidateId: uuid("candidate_id"),
+    provider: text("provider").notNull(),
+    providerSubjectRef: text("provider_subject_ref").notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    queuedAt: timestamp("queued_at", { mode: "string" }),
+    completedAt: timestamp("completed_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+  },
+  table => [
+    index("identity_provider_deletion_outbox_status_idx").on(table.status, table.createdAt),
+    unique("identity_provider_deletion_outbox_candidate_unique").on(table.candidateId),
+    check("identity_provider_deletion_outbox_provider_check", sql`${table.provider} IN ('customers_ai', 'rb2b')`),
+    check(
+      "identity_provider_deletion_outbox_status_check",
+      sql`${table.status} IN ('pending', 'queued', 'completed', 'failed')`
+    ),
+  ]
+);
+
 export const identitySuppressions = pgTable(
   "identity_suppressions",
   {

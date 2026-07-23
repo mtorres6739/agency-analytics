@@ -28,6 +28,7 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
   const [resolution, setResolution] = useState<SiteResolutionSettings | null>(null);
   const confirmedResolution = useRef<SiteResolutionSettings | null>(null);
   const [resolutionBlock, setResolutionBlock] = useState<string | null>(null);
+  const [resolutionComplianceBlocked, setResolutionComplianceBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const reload = async () => {
@@ -39,6 +40,7 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
     confirmedResolution.current = resolutionResponse.settings;
     setResolution(resolutionResponse.settings);
     setResolutionBlock(resolutionResponse.complianceReason);
+    setResolutionComplianceBlocked(resolutionResponse.complianceBlocked);
   };
 
   useEffect(() => {
@@ -208,7 +210,13 @@ export function IdentityTab({ siteId, disabled = false }: { siteId: number; disa
         >
           <Switch
             checked={resolution.enabled}
-            disabled={disabled || busy || resolution.complianceState !== "approved" || !!resolutionBlock}
+            disabled={
+              disabled ||
+              busy ||
+              resolution.complianceState !== "approved" ||
+              resolutionComplianceBlocked ||
+              !!resolutionBlock
+            }
             onCheckedChange={enabled => void patchResolution({ enabled })}
           />
         </SettingRow>

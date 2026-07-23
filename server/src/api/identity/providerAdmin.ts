@@ -6,6 +6,7 @@ import { agencyAuditEvents, identityProviderConnections } from "../../db/postgre
 import { getAgencyPrincipal } from "../agency/access.js";
 import { customersAiResolver, rb2bResolver } from "../../services/identityResolution/httpResolver.js";
 import { pdlEnrichmentProvider } from "../../services/identityResolution/pdlEnrichmentProvider.js";
+import { getPilotBudgetCents, getProviderCostMicros } from "../../services/identityResolution/pricing.js";
 
 const paramsSchema = z.object({ organizationId: z.string().min(1), provider: z.enum(["customers_ai", "rb2b", "pdl"]) });
 const connectionSchema = z
@@ -82,6 +83,15 @@ export async function upsertIdentityProviderConnection(
   if (!principal?.canManage) return reply.status(403).send({ error: "Organization administrator access is required" });
   if (body.data.status === "approved" && !body.data.attestations) {
     return reply.status(409).send({ error: "All provider contract and data-rights attestations are required" });
+  }
+  if (
+    body.data.status === "approved" &&
+    (getPilotBudgetCents() === null || getProviderCostMicros(params.data.provider) === null)
+  ) {
+    return reply.status(409).send({
+      error: "A valid provider price and organization pilot budget are required before approval",
+      code: "PROVIDER_PRICING_NOT_CONFIGURED",
+    });
   }
   if (body.data.status === "approved" && params.data.provider !== "pdl" && !body.data.capabilities.includes("delete")) {
     return reply.status(409).send({ error: "Provider deletion capability is required before approval" });

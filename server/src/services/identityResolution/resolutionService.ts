@@ -1,5 +1,5 @@
 import { Queue, Worker, type Job } from "bullmq";
-import { and, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { IdentityProvider, ResolutionCandidate } from "@rybbit/shared";
 import { db } from "../../db/postgres/postgres.js";
 import { redis } from "../../db/redis/redis.js";
@@ -7,6 +7,7 @@ import {
   identityCandidates,
   identityConsentReceipts,
   identityProviderConnections,
+  identityProviderDeletionOutbox,
   identityProviderUsage,
   identityResolutionAttempts,
   identitySuppressions,
@@ -25,13 +26,14 @@ import { customersAiResolver, rb2bResolver } from "./httpResolver.js";
 import { pdlEnrichmentProvider } from "./pdlEnrichmentProvider.js";
 import type { IdentityResolver } from "./types.js";
 import { scoreIdentityCandidate } from "./leadIntelligence.js";
+import { getPilotBudgetCents, getProviderCostMicros } from "./pricing.js";
 
 const QUEUE_NAME = "identity-resolution";
 const ENVELOPE_TTL_MS = 10 * 60 * 1000;
 const CANDIDATE_RETENTION_DAYS = 30;
 
 type ResolutionJob = { attemptId: string; encryptedContext: string; queuedAt: number };
-type ProviderDeletionJob = { provider: IdentityProvider; encryptedProviderSubject: string; queuedAt: number };
+type ProviderDeletionJob = { outboxId: string };
 const DELETION_QUEUE_NAME = "identity-provider-deletion";
 
 const redisConnection = () => ({
@@ -45,9 +47,6 @@ const resolvers: Record<IdentityProvider, IdentityResolver> = {
   rb2b: rb2bResolver,
 };
 
-const providerCostMicros = (provider: IdentityProvider) =>
-  Math.max(0, Number(process.env[`${provider.toUpperCase()}_COST_MICROS`] || 0));
-
 function safeFailure(error: unknown) {
   if (error instanceof Error && error.name) return error.name.slice(0, 80);
   return "ResolutionError";
@@ -58,6 +57,7 @@ function utcDate() {
 }
 
 type UsageDatabase = Pick<typeof db, "insert">;
+type DeletionOutboxDatabase = Pick<typeof db, "insert">;
 
 async function addUsage(
   input: {
@@ -164,10 +164,8 @@ async function reserveBudget(input: {
       "NX"
     ),
   ]);
-  const organizationMonthlyCapCents = Math.min(
-    75_000,
-    Math.max(0, Number(process.env.IDENTITY_PILOT_MONTHLY_BUDGET_CENTS || 75_000))
-  );
+  const organizationMonthlyCapCents = getPilotBudgetCents();
+  if (organizationMonthlyCapCents === null) return false;
   const reserved = await redis.eval(
     `
       local daily = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -215,6 +213,7 @@ class IdentityResolutionService {
   private deletionQueue = new Queue<ProviderDeletionJob>(DELETION_QUEUE_NAME, { connection: redisConnection() });
   private worker?: Worker<ResolutionJob>;
   private deletionWorker?: Worker<ProviderDeletionJob>;
+  private deletionDispatchTimer?: NodeJS.Timeout;
   private initialized = false;
   private logger = createServiceLogger("identity-resolution");
 
@@ -236,25 +235,66 @@ class IdentityResolutionService {
     this.deletionWorker = new Worker<ProviderDeletionJob>(
       DELETION_QUEUE_NAME,
       async job => {
-        if (Date.now() - job.data.queuedAt > 7 * 24 * 60 * 60 * 1000) throw new Error("DeletionJobExpired");
-        const envelope = decryptResolutionEnvelope(job.data.encryptedProviderSubject);
-        const providerSubjectId = typeof envelope.providerSubjectId === "string" ? envelope.providerSubjectId : "";
-        if (!providerSubjectId) throw new Error("DeletionSubjectInvalid");
-        await resolvers[job.data.provider].deleteSubject(providerSubjectId);
+        const [outbox] = await db
+          .select()
+          .from(identityProviderDeletionOutbox)
+          .where(eq(identityProviderDeletionOutbox.id, job.data.outboxId))
+          .limit(1);
+        if (!outbox || outbox.status === "completed") return;
+        await db
+          .update(identityProviderDeletionOutbox)
+          .set({ attempts: sql`${identityProviderDeletionOutbox.attempts} + 1`, updatedAt: new Date().toISOString() })
+          .where(eq(identityProviderDeletionOutbox.id, outbox.id));
+        try {
+          const envelope = decryptResolutionEnvelope(outbox.providerSubjectRef);
+          const providerSubjectId = typeof envelope.providerSubjectId === "string" ? envelope.providerSubjectId : "";
+          if (!providerSubjectId) throw new Error("DeletionSubjectInvalid");
+          await resolvers[outbox.provider as IdentityProvider].deleteSubject(providerSubjectId);
+          await db
+            .update(identityProviderDeletionOutbox)
+            .set({
+              status: "completed",
+              lastError: null,
+              completedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(identityProviderDeletionOutbox.id, outbox.id));
+        } catch (error) {
+          const attemptsAllowed = typeof job.opts.attempts === "number" ? job.opts.attempts : 1;
+          const terminalFailure = job.attemptsMade + 1 >= attemptsAllowed;
+          await db
+            .update(identityProviderDeletionOutbox)
+            .set({
+              status: terminalFailure ? "failed" : "queued",
+              lastError: safeFailure(error),
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(identityProviderDeletionOutbox.id, outbox.id));
+          throw error;
+        }
       },
       { connection: redisConnection(), concurrency: 2 }
     );
     this.deletionWorker.on("failed", (job, error) =>
       this.logger.error(
-        { provider: job?.data.provider, errorName: safeFailure(error) },
+        { outboxId: job?.data.outboxId, errorName: safeFailure(error) },
         "Provider identity deletion job failed"
       )
     );
     await this.deletionWorker.waitUntilReady();
+    await this.dispatchProviderDeletions();
+    this.deletionDispatchTimer = setInterval(() => {
+      void this.dispatchProviderDeletions().catch(error =>
+        this.logger.error({ errorName: safeFailure(error) }, "Provider deletion outbox dispatch failed")
+      );
+    }, 60_000);
+    this.deletionDispatchTimer.unref();
     this.initialized = true;
   }
 
   async shutdown() {
+    if (this.deletionDispatchTimer) clearInterval(this.deletionDispatchTimer);
+    this.deletionDispatchTimer = undefined;
     await this.worker?.close();
     await this.deletionWorker?.close();
     await this.queue.close();
@@ -312,9 +352,12 @@ class IdentityResolutionService {
       )
       .limit(1);
     if (suppression) return { queued: false, code: "SUPPRESSED" };
-    const estimatedCostMicros =
-      providerCostMicros(settings.primaryProvider as IdentityProvider) +
-      (settings.enrichmentEnabled ? Math.max(0, Number(process.env.PDL_COST_MICROS || 0)) : 0);
+    const providerCost = getProviderCostMicros(settings.primaryProvider as IdentityProvider);
+    const enrichmentCost = settings.enrichmentEnabled ? getProviderCostMicros("pdl") : 0;
+    if (providerCost === null || enrichmentCost === null) {
+      return { queued: false, code: "PROVIDER_PRICING_NOT_CONFIGURED" };
+    }
+    const estimatedCostMicros = providerCost + enrichmentCost;
     if (
       !(await reserveBudget({
         siteId: input.siteId,
@@ -345,7 +388,7 @@ class IdentityResolutionService {
         anonymousSubject: input.anonymousSubject,
         provider: settings.primaryProvider,
         status: "queued",
-        estimatedCostMicros: providerCostMicros(settings.primaryProvider as IdentityProvider),
+        estimatedCostMicros: providerCost,
       })
       .returning({ id: identityResolutionAttempts.id });
     const encryptedContext = encryptResolutionEnvelope({
@@ -370,28 +413,69 @@ class IdentityResolutionService {
     return { queued: true, correlationToken, expiresAt };
   }
 
-  async queueProviderDeletions(candidates: Array<{ id: string; provider: string; providerSubjectRef: string | null }>) {
+  async stageProviderDeletions(
+    candidates: Array<{ id: string; siteId: number; provider: string; providerSubjectRef: string | null }>,
+    database: DeletionOutboxDatabase = db
+  ) {
+    const values = candidates
+      .filter(
+        (candidate): candidate is typeof candidate & { providerSubjectRef: string } =>
+          Boolean(candidate.providerSubjectRef) && ["customers_ai", "rb2b"].includes(candidate.provider)
+      )
+      .map(candidate => ({
+        siteId: candidate.siteId,
+        candidateId: candidate.id,
+        provider: candidate.provider,
+        providerSubjectRef: candidate.providerSubjectRef,
+      }));
+    if (!values.length) return [];
+    return database
+      .insert(identityProviderDeletionOutbox)
+      .values(values)
+      .onConflictDoNothing({ target: identityProviderDeletionOutbox.candidateId })
+      .returning({ id: identityProviderDeletionOutbox.id });
+  }
+
+  async dispatchProviderDeletions(outboxIds?: string[]) {
+    const conditions = [eq(identityProviderDeletionOutbox.status, "pending")];
+    if (outboxIds) {
+      if (!outboxIds.length) return 0;
+      conditions.push(inArray(identityProviderDeletionOutbox.id, outboxIds));
+    }
+    const records = await db
+      .select({ id: identityProviderDeletionOutbox.id })
+      .from(identityProviderDeletionOutbox)
+      .where(and(...conditions))
+      .limit(500);
     let queued = 0;
-    for (const candidate of candidates) {
-      if (!candidate.providerSubjectRef || !["customers_ai", "rb2b"].includes(candidate.provider)) continue;
+    for (const record of records) {
       await this.deletionQueue.add(
         "delete-provider-subject",
+        { outboxId: record.id },
         {
-          provider: candidate.provider as IdentityProvider,
-          encryptedProviderSubject: candidate.providerSubjectRef,
-          queuedAt: Date.now(),
-        },
-        {
-          jobId: `identity-provider-delete-${candidate.id}`,
+          jobId: `identity-provider-delete-${record.id}`,
           attempts: 10,
           backoff: { type: "exponential", delay: 30_000 },
-          removeOnComplete: true,
+          removeOnComplete: { age: 7 * 24 * 60 * 60, count: 10_000 },
           removeOnFail: { age: 7 * 24 * 60 * 60, count: 1_000 },
         }
       );
+      await db
+        .update(identityProviderDeletionOutbox)
+        .set({ status: "queued", queuedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+        .where(
+          and(eq(identityProviderDeletionOutbox.id, record.id), eq(identityProviderDeletionOutbox.status, "pending"))
+        );
       queued += 1;
     }
     return queued;
+  }
+
+  async queueProviderDeletions(
+    candidates: Array<{ id: string; siteId: number; provider: string; providerSubjectRef: string | null }>
+  ) {
+    const staged = await db.transaction(tx => this.stageProviderDeletions(candidates, tx));
+    return this.dispatchProviderDeletions(staged.map(record => record.id));
   }
 
   async ingestWebhookCandidates(input: {
@@ -441,6 +525,8 @@ class IdentityResolutionService {
     ) {
       return { accepted: false, code: "DISABLED" };
     }
+    const costMicros = getProviderCostMicros(input.provider);
+    if (costMicros === null) return { accepted: false, code: "PROVIDER_PRICING_NOT_CONFIGURED" };
     const hasConflict = input.candidates.length > 1;
     for (const candidate of input.candidates) {
       const providerSubjectKey = deriveScopedIdentityKey(
@@ -497,7 +583,6 @@ class IdentityResolutionService {
         });
       }
     }
-    const costMicros = providerCostMicros(input.provider);
     await Promise.all([
       db.insert(identityResolutionAttempts).values({
         siteId: input.siteId,
@@ -614,6 +699,8 @@ class IdentityResolutionService {
     const started = Date.now();
     let enrichmentUsage: UsageOutcome | null = null;
     try {
+      const costMicros = getProviderCostMicros(provider);
+      if (costMicros === null) throw new Error("ProviderPricingNotConfigured");
       const candidates = await resolvers[provider].resolve({
         siteId: context.siteId,
         sitePublicId: context.sitePublicId,
@@ -622,7 +709,6 @@ class IdentityResolutionService {
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-      const costMicros = providerCostMicros(provider);
       const hasConflict = candidates.length > 1;
       for (const original of candidates) {
         let candidate = original;
@@ -635,6 +721,8 @@ class IdentityResolutionService {
         ) {
           const enrichStarted = Date.now();
           try {
+            const enrichmentCostMicros = getProviderCostMicros("pdl");
+            if (enrichmentCostMicros === null) throw new Error("ProviderPricingNotConfigured");
             const enrichment = await pdlEnrichmentProvider.enrich(candidate.traits);
             candidate = mergeEnrichment(candidate, enrichment);
             enrichmentUsage = {
@@ -643,7 +731,7 @@ class IdentityResolutionService {
               matched: Boolean(enrichment),
               failed: false,
               latencyMs: Date.now() - enrichStarted,
-              costMicros: Number(process.env.PDL_COST_MICROS || 0),
+              costMicros: enrichmentCostMicros,
             };
           } catch (error) {
             enrichmentUsage = {

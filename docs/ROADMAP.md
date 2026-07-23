@@ -8,7 +8,7 @@
 - M3 client summary metrics are live in code; acquisition/content/GSC/Web Vitals portfolio aggregation and performance validation remain.
 - M4 reporting is complete with BullMQ workers, private encrypted artifacts, signed downloads, retries, and Resend delivery.
 - M5 production is live. The three-site GA4 comparison, projected-load test, and first clean-environment restoration drill remain launch gates before broad client onboarding.
-- Provider-neutral identity is implemented on PR `#21`, disabled by default, and hardened against replay loss, retry cost inflation, pre-commit external side effects, failed consent withdrawal, and stale optimistic settings. No provider can activate before its contract, data-rights, deletion, health, and budget gates pass.
+- Provider-neutral identity is implemented on PR `#21`, disabled by default, and hardened against replay loss, retry cost inflation, pre-commit external side effects, lost provider-deletion jobs, failed consent withdrawal, cross-site consent reuse, invalid pricing, and stale optimistic settings. No provider can activate before its contract, data-rights, deletion, health, pricing, and budget gates pass.
 
 ## M0: Foundation
 

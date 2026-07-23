@@ -1,13 +1,23 @@
 import type { IdentificationConsentState, ScriptConfig } from "./types.js";
 
-type StoredConsent = IdentificationConsentState & { policyVersion: string; withdrawalToken?: string };
+type StoredConsent = IdentificationConsentState & {
+  policyVersion: string;
+  withdrawalToken?: string;
+  revocationPending?: boolean;
+};
 
 export class IdentityConsentManager {
   private readonly storageKey: string;
   private banner?: HTMLElement;
 
   constructor(private readonly config: ScriptConfig) {
-    this.storageKey = `${config.namespace}-identity-consent`;
+    let analyticsOrigin = "invalid-origin";
+    try {
+      analyticsOrigin = new URL(config.analyticsHost).origin;
+    } catch {
+      // Invalid analytics hosts fail closed in grant() and loadConnector().
+    }
+    this.storageKey = `${config.namespace}-identity-consent:${encodeURIComponent(analyticsOrigin)}:${config.siteId}`;
   }
 
   private gpcEnabled() {
@@ -23,12 +33,13 @@ export class IdentityConsentManager {
     }
   }
 
-  private write(status: IdentificationConsentState["status"], withdrawalToken?: string) {
+  private write(status: IdentificationConsentState["status"], withdrawalToken?: string, revocationPending = false) {
     const state: StoredConsent = {
       status,
       gpc: this.gpcEnabled(),
       policyVersion: this.config.identityPolicyVersion || "identity-v1",
       withdrawalToken,
+      revocationPending,
     };
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(state));
@@ -51,15 +62,31 @@ export class IdentityConsentManager {
       credentials: "omit",
       mode: "cors",
     });
-    if (!response.ok) return { ok: false, correlationToken: undefined as string | undefined };
+    if (!response.ok)
+      return {
+        ok: false,
+        granted: false,
+        correlationToken: undefined as string | undefined,
+        withdrawalToken: undefined as string | undefined,
+      };
     const result = (await response.json?.().catch(() => ({}))) as
-      | { correlationToken?: string; withdrawalToken?: string }
+      | { success?: boolean; granted?: boolean; correlationToken?: string; withdrawalToken?: string }
       | undefined;
-    return { ok: true, correlationToken: result?.correlationToken, withdrawalToken: result?.withdrawalToken };
+    return {
+      ok: result?.success === true,
+      granted: result?.granted === true,
+      correlationToken: result?.correlationToken,
+      withdrawalToken: result?.withdrawalToken,
+    };
   }
 
   private loadConnector(correlationToken?: string) {
-    if (!correlationToken || !this.config.identityConnectorUrl) return;
+    if (!this.config.identityResolutionEnabled || !correlationToken || !this.config.identityConnectorUrl) return;
+    try {
+      if (new URL(this.config.identityConnectorUrl).origin !== new URL(this.config.analyticsHost).origin) return;
+    } catch {
+      return;
+    }
     if (document.querySelector(`script[data-rybbit-identity-connector="${this.config.siteId}"]`)) return;
     const script = document.createElement("script");
     script.src = this.config.identityConnectorUrl;
@@ -71,13 +98,24 @@ export class IdentityConsentManager {
   }
 
   async initialize() {
+    const stored = this.read();
+    if (stored?.revocationPending && stored.withdrawalToken) {
+      await this.withdraw();
+      return;
+    }
     if (!this.config.identityResolutionEnabled) return;
     if (this.gpcEnabled()) {
       this.write("denied");
       await this.send(false, true).catch(() => ({ ok: false }));
       return;
     }
-    if (this.read()) return;
+    if (stored) return;
+    if (!document.body) {
+      await new Promise<void>(resolve => {
+        document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+      });
+    }
+    if (!document.body || this.read()) return;
     this.renderBanner();
   }
 
@@ -87,18 +125,20 @@ export class IdentityConsentManager {
   }
 
   async grant() {
-    if (this.gpcEnabled()) return false;
+    if (!this.config.identityResolutionEnabled || this.gpcEnabled()) return false;
     const result = await this.send(true, false).catch(() => ({
       ok: false,
+      granted: false,
       correlationToken: undefined,
       withdrawalToken: undefined,
     }));
-    if (result.ok) {
+    if (result.ok && result.granted && result.withdrawalToken) {
       this.write("granted", result.withdrawalToken);
       this.removeBanner();
       this.loadConnector(result.correlationToken);
+      return true;
     }
-    return result.ok;
+    return false;
   }
 
   async reject() {
@@ -110,6 +150,14 @@ export class IdentityConsentManager {
 
   async withdraw() {
     const stored = this.read();
+    if (!stored?.withdrawalToken) {
+      this.write("denied");
+      this.removeBanner();
+      return false;
+    }
+    this.write("denied", stored.withdrawalToken, true);
+    this.removeBanner();
+    document.querySelector(`script[data-rybbit-identity-connector="${this.config.siteId}"]`)?.remove();
     const response = await fetch(`${this.config.analyticsHost}/identity/withdraw`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -117,10 +165,12 @@ export class IdentityConsentManager {
       credentials: "omit",
       mode: "cors",
     }).catch(() => null);
-    const withdrawn = response?.ok === true;
+    const result = response?.ok
+      ? ((await response.json?.().catch(() => null)) as { success?: boolean; suppressed?: boolean } | null)
+      : null;
+    const withdrawn = result?.success === true && result.suppressed === true;
     if (withdrawn) {
       this.write("denied");
-      this.removeBanner();
     }
     return withdrawn;
   }

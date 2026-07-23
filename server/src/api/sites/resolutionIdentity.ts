@@ -19,6 +19,7 @@ import { sendCandidateToGhl } from "../../services/identityResolution/ghlActivat
 import { generateLeadBrief, scoreIdentityCandidate } from "../../services/identityResolution/leadIntelligence.js";
 import { deriveScopedIdentityKey } from "../../services/identity/identityCrypto.js";
 import { identityResolutionService } from "../../services/identityResolution/resolutionService.js";
+import { getPilotBudgetCents, getProviderCostMicros } from "../../services/identityResolution/pricing.js";
 
 const providerSchema = z.enum(["customers_ai", "rb2b"]);
 const settingsSchema = z
@@ -139,6 +140,16 @@ export async function updateResolutionSettings(
     });
   }
   if (requested.enabled) {
+    if (
+      getPilotBudgetCents() === null ||
+      getProviderCostMicros(requested.primaryProvider) === null ||
+      (requested.enrichmentEnabled && getProviderCostMicros("pdl") === null)
+    ) {
+      return reply.status(409).send({
+        error: "Valid provider pricing and an organization pilot budget are required before activation",
+        code: "PROVIDER_PRICING_NOT_CONFIGURED",
+      });
+    }
     if (!site.organizationId) return reply.status(409).send({ error: "Site organization is not configured" });
     const [connection] = await db
       .select({
@@ -320,6 +331,7 @@ async function candidateAction(
   const now = new Date().toISOString();
   let backfillRequired = false;
   let reviewId: string;
+  let deletionOutboxIds: string[] = [];
   try {
     reviewId = await db.transaction(async tx => {
       const [reviewed] = await tx
@@ -354,15 +366,20 @@ async function candidateAction(
           sanitizedResult: {},
         })
         .returning({ id: identityActivationReviews.id });
-      if (decision === "suppressed" && site.id) {
-        await tx
-          .insert(identitySuppressions)
-          .values({
-            siteId: site.siteId,
-            suppressionKey: deriveScopedIdentityKey(site.id, "identity-suppression-v1", candidate.anonymousSubject),
-            reason: "reviewer_suppressed",
-          })
-          .onConflictDoNothing();
+      if (decision === "suppressed") {
+        if (site.id) {
+          await tx
+            .insert(identitySuppressions)
+            .values({
+              siteId: site.siteId,
+              suppressionKey: deriveScopedIdentityKey(site.id, "identity-suppression-v1", candidate.anonymousSubject),
+              reason: "reviewer_suppressed",
+            })
+            .onConflictDoNothing();
+        }
+        deletionOutboxIds = (await identityResolutionService.stageProviderDeletions([candidate], tx)).map(
+          record => record.id
+        );
       }
       return review.id;
     });
@@ -394,7 +411,7 @@ async function candidateAction(
     });
   }
   if (decision === "suppressed") {
-    await identityResolutionService.queueProviderDeletions([candidate]);
+    await identityResolutionService.dispatchProviderDeletions(deletionOutboxIds);
   }
   await audit(site, request.user?.id ?? null, `identity_candidate.${decision}`, candidate.id);
   return reply.send({ success: true, linkedUserId, crm });

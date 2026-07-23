@@ -10,6 +10,8 @@ import { usageService } from "./services/usageService.js";
 import { weeklyReportService } from "./services/weekyReports/weeklyReportService.js";
 import { agencyReportService } from "./services/agencyReports/reportService.js";
 import { trackingDeploymentService } from "./services/trackingDeployment/trackingDeploymentService.js";
+import { identityResolutionService } from "./services/identityResolution/resolutionService.js";
+import { identityRetentionService } from "./services/identity/identityRetentionService.js";
 
 const logger = createServiceLogger("cluster");
 
@@ -49,6 +51,8 @@ if (workerCount === 0) {
   usageService.startUsageCheckCron();
   await agencyReportService.initialize();
   await trackingDeploymentService.initialize();
+  await identityResolutionService.initialize();
+  identityRetentionService.start();
   if (IS_CLOUD && process.env.NODE_ENV !== "development") {
     weeklyReportService.startWeeklyReportCron();
     reengagementService.startReengagementCron();
@@ -123,6 +127,8 @@ if (workerCount === 0) {
     telemetryService.stopTelemetryCron();
     await agencyReportService.shutdown();
     await trackingDeploymentService.shutdown();
+    await identityResolutionService.shutdown();
+    identityRetentionService.stop();
     if (IS_CLOUD) {
       weeklyReportService.stopWeeklyReportCron();
       reengagementService.stopReengagementCron();
