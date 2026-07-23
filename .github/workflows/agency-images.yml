@@ -27,9 +27,9 @@ jobs:
         working-directory: shared
       - run: npm ci && npm audit --omit=dev --audit-level=high
         working-directory: server
-      - run: npm run test:run -- src/lib/auth-middleware.test.ts src/api/agency src/api/sites/addSite.test.ts src/api/sites/deleteSite.test.ts src/services/tracker/trackEvent.test.ts src/services/trackingDeployment src/services/identity src/analytics-script/tracking.test.ts && npm run build
+      - run: npm run test:run -- src/lib/auth-middleware.test.ts src/api/agency src/api/identity src/api/sites/addSite.test.ts src/api/sites/deleteSite.test.ts src/api/sites/resolutionIdentity.test.ts src/services/tracker/trackEvent.test.ts src/services/trackingDeployment src/services/identity src/services/identityResolution src/analytics-script/config.test.ts src/analytics-script/identityConsent.test.ts src/analytics-script/tracking.test.ts && npm run build && npm run db:check
         working-directory: server
-      - run: npm ci && npm audit --omit=dev --audit-level=high && npm run test:proxy && npx tsc --noEmit && npm run build
+      - run: npm ci && npm audit --omit=dev --audit-level=high && npm run lint && npm run test:proxy && npx tsc --noEmit && npm run build
         working-directory: client
       - run: bash -n infra/agency/deploy.sh infra/agency/backup.sh infra/agency/restore.sh infra/agency/install-backup-timer.sh
       - run: docker compose --env-file infra/agency/.env.production.example -f docker-compose.yml -f infra/agency/docker-compose.production.yml config --quiet
