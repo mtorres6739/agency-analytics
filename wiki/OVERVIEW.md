@@ -88,6 +88,8 @@ Provider-neutral visitor identity is implemented on PR `#21` and remains disable
 
 Final review hardening adds migration `0023` and a transactional provider-deletion outbox so local erasure and the durable external deletion request commit together. Browser consent is scoped by analytics origin and site, immediately stops identity matching during a failed withdrawal while retaining a retry token, waits for `document.body`, and rejects cross-origin connectors. Paid provider pricing is required and finite; invalid pricing or an organization cap outside $0-$750 blocks approval and activation.
 
+`fastify-raw-body` with `encoding: false` replaces Fastify's inherited JSON parser so signed webhooks retain exact bytes. Better Auth's encapsulated pass-through scope must remove that inherited parser before adding its own JSON parser; otherwise clustered production workers crash with `FST_ERR_CTP_ALREADY_PRESENT`. `authContentTypeParsers.test.ts` exercises the combined webhook/auth startup path and is a required immutable-image release gate.
+
 No CustomersAI, RB2B, or PDL credentials may be added until the provider supplies approved sandbox schemas, webhook and deletion details, a DPA and subprocessor list, written multi-client display/storage/export/deletion rights, and pricing within the $750 monthly pilot cap. Palm Squad remains the first consumer shadow pilot after those gates pass; provider-derived candidates must not route to GHL or trigger outreach automatically.
 
 ## Knowledge rule
