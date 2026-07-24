@@ -1,19 +1,36 @@
 "use client";
 
-import { BarChart3, Building2, ChevronDown, FileText, LayoutDashboard, Menu, Settings, X } from "lucide-react";
+import {
+  BarChart3,
+  Building2,
+  ChevronDown,
+  DatabaseZap,
+  FileText,
+  LayoutDashboard,
+  Menu,
+  Settings,
+  X,
+} from "lucide-react";
 import { useExtracted } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useUserOrganizations } from "../../api/admin/hooks/useOrganizations";
+import { authClient } from "../../lib/auth";
 import { OrganizationSelector } from "../OrganizationSelector";
 import { cn } from "../../lib/utils";
 
 function NavItems({ pathname }: { pathname: string }) {
   const t = useExtracted();
+  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const { data: organizations } = useUserOrganizations();
+  const membership = organizations?.find(organization => organization.id === activeOrganization?.id);
+  const canManageProviders = membership?.role === "owner" || membership?.role === "admin";
   const navigation = [
     { href: "/portfolio", label: t("Portfolio"), icon: LayoutDashboard },
     { href: "/clients", label: t("Clients"), icon: Building2 },
     { href: "/reports", label: t("Reports"), icon: FileText },
+    ...(canManageProviders ? [{ href: "/providers", label: t("Data providers"), icon: DatabaseZap }] : []),
     { href: "/settings/organization", label: t("Settings"), icon: Settings },
   ];
   return (

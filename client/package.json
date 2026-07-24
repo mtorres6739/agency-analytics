@@ -9,6 +9,7 @@
     "materialize:shared": "node scripts/materialize-shared.mjs",
     "start": "next start -p 3002",
     "test:proxy": "node --experimental-strip-types --test src/lib/proxyRoutes.test.ts",
+    "test:i18n": "node --experimental-strip-types --test src/i18n/messageFallback.test.ts",
     "extract": "node scripts/extract-messages.mjs",
     "lint": "eslint .",
     "knip": "knip",

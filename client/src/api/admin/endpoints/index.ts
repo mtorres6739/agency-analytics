@@ -38,6 +38,13 @@ export type {
   RemoveUserFromOrganizationInput,
 } from "./organizations";
 
+// Identity provider connections
+export {
+  fetchIdentityProviderConnections,
+  updateIdentityProviderConnection,
+  testIdentityProviderConnection,
+} from "./identityProviders";
+
 // Admin Organizations endpoints
 export { getAdminOrganizations } from "./adminOrganizations";
 export type { AdminOrganizationData } from "./adminOrganizations";

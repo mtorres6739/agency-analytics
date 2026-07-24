@@ -1125,7 +1125,7 @@ export const identityProviderConnections = pgTable(
     capabilities: jsonb("capabilities").$type<string[]>().notNull().default([]),
     status: text("status").notNull().default("pending"),
     credentialRef: text("credential_ref"),
-    policyAttestations: jsonb("policy_attestations").$type<Record<string, boolean>>().notNull().default({}),
+    policyAttestations: jsonb("policy_attestations").$type<Record<string, unknown>>().notNull().default({}),
     policyApprovedBy: text("policy_approved_by"),
     policyApprovedAt: timestamp("policy_approved_at", { mode: "string" }),
     lastHealthCheckAt: timestamp("last_health_check_at", { mode: "string" }),

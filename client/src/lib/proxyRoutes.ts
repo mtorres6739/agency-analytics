@@ -15,6 +15,7 @@ export const BUILT_IN_SINGLE_SEGMENT_ROUTES = new Set([
   "portfolio",
   "clients",
   "reports",
+  "providers",
   "as",
   "_next",
   "api",
