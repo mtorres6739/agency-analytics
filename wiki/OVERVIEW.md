@@ -94,6 +94,8 @@ No CustomersAI, RB2B, or PDL credentials may be added until the provider supplie
 
 Agency provider onboarding lives at `/providers` and is restricted to organization owners and administrators at both the UI and API layers. The screen never accepts or returns secrets; it reports server-side credential, price, budget, transport, deletion, and health readiness, records contract attestations plus reference IDs, and enforces a save-pending → health-check → approve sequence. Any configuration edit invalidates the prior health result, and approval is bound to the exact capability/account configuration that passed.
 
+Every new single-segment application route must be added to `BUILT_IN_SINGLE_SEGMENT_ROUTES` or the proxy will treat it as a site ID. Non-English extracted messages may be empty by design; the request locale loader merges empty and missing values from the English catalog, and `messageFallback.test.ts` protects that behavior.
+
 ## Knowledge rule
 
 Store how this fork works in this wiki. Promote only reusable self-hosting, analytics, security, or agent-workflow patterns to the master Knowledge OS.

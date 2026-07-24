@@ -4,7 +4,7 @@ import test from "node:test";
 import { getCanonicalSitePath } from "./proxyRoutes.ts";
 
 test("keeps authentication and agency routes out of site routing", () => {
-  for (const route of ["/login", "/two-factor", "/portfolio", "/clients", "/reports", "/settings"]) {
+  for (const route of ["/login", "/two-factor", "/portfolio", "/clients", "/reports", "/providers", "/settings"]) {
     assert.equal(getCanonicalSitePath(route), null, `${route} must remain a first-class application route`);
   }
 });
