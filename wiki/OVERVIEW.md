@@ -92,6 +92,8 @@ Final review hardening adds migration `0023` and a transactional provider-deleti
 
 No CustomersAI, RB2B, or PDL credentials may be added until the provider supplies approved sandbox schemas, webhook and deletion details, a DPA and subprocessor list, written multi-client display/storage/export/deletion rights, and pricing within the $750 monthly pilot cap. Palm Squad remains the first consumer shadow pilot after those gates pass; provider-derived candidates must not route to GHL or trigger outreach automatically.
 
+Agency provider onboarding lives at `/providers` and is restricted to organization owners and administrators at both the UI and API layers. The screen never accepts or returns secrets; it reports server-side credential, price, budget, transport, deletion, and health readiness, records contract attestations plus reference IDs, and enforces a save-pending → health-check → approve sequence. Any configuration edit invalidates the prior health result, and approval is bound to the exact capability/account configuration that passed.
+
 ## Knowledge rule
 
 Store how this fork works in this wiki. Promote only reusable self-hosting, analytics, security, or agent-workflow patterns to the master Knowledge OS.

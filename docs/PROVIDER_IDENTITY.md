@@ -66,7 +66,7 @@ Activation requires all of the following:
 1. DPA, subprocessors, webhook-signing scheme, deletion support, and sandbox schema are recorded.
 2. Written rights cover export, normalized storage, client display, deletion, and provider replacement.
 3. Monthly commitment is below $750.
-4. The provider connection durably records all six data-rights attestations, the approving administrator, and `status=approved`.
+4. The provider connection durably records the DPA, subprocessors, sandbox schema, webhook signing, data rights, deletion rights, replacement rights, pricing attestations, bounded evidence references, the approving administrator, and `status=approved`.
 5. The site has `complianceState=approved`, is not on the hard block list, and has a daily and monthly cap.
 6. The provider health test passes.
 7. Shadow mode remains enabled for the 14-day pilot.
@@ -76,6 +76,16 @@ Organization API:
 - `GET /api/organizations/:organizationId/providers`
 - `PUT /api/organizations/:organizationId/providers/:provider`
 - `POST /api/organizations/:organizationId/providers/:provider/test`
+
+The agency `/providers` screen is an owner/admin-only operator control plane. Analysts and client members cannot request provider account metadata. It shows server-side credential, pricing, budget, transport, deletion, contract, and health readiness without returning secret values. The required sequence is:
+
+1. Install credentials, documented endpoints, and exact per-request pricing on the analytics server.
+2. Save the connection as pending with its capabilities, contract attestations, and evidence references.
+3. Run the provider health check.
+4. Approve the unchanged configuration.
+5. Configure a compliant site in shadow mode.
+
+Editing a pending or disabled connection clears its prior health result. Approval is rejected unless the exact saved account, capability set, and credential reference most recently passed a health check.
 
 Site API:
 

@@ -1,14 +1,50 @@
 import { and, eq } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import {
+  identityProviderConnectionProviders,
+  type IdentityProviderCapability,
+  type IdentityProviderConnectionProvider,
+  type IdentityProviderPolicyAttestations,
+} from "@rybbit/shared";
 import { db } from "../../db/postgres/postgres.js";
 import { agencyAuditEvents, identityProviderConnections } from "../../db/postgres/schema.js";
 import { getAgencyPrincipal } from "../agency/access.js";
 import { customersAiResolver, rb2bResolver } from "../../services/identityResolution/httpResolver.js";
 import { pdlEnrichmentProvider } from "../../services/identityResolution/pdlEnrichmentProvider.js";
-import { getPilotBudgetCents, getProviderCostMicros } from "../../services/identityResolution/pricing.js";
+import {
+  getProviderPolicyBlockers,
+  getProviderRuntimeReadiness,
+  hasHealthySavedProviderConfiguration,
+  providerCredentialRefs,
+} from "../../services/identityResolution/providerReadiness.js";
 
 const paramsSchema = z.object({ organizationId: z.string().min(1), provider: z.enum(["customers_ai", "rb2b", "pdl"]) });
+const policyEvidenceSchema = z
+  .object({
+    dpaReference: z.string().trim().max(500).optional(),
+    subprocessorsReference: z.string().trim().max(500).optional(),
+    schemaReference: z.string().trim().max(500).optional(),
+    deletionReference: z.string().trim().max(500).optional(),
+    dataRightsReference: z.string().trim().max(500).optional(),
+    pricingReference: z.string().trim().max(500).optional(),
+  })
+  .strict();
+const policyAttestationsSchema = z
+  .object({
+    dpaReviewed: z.boolean().optional(),
+    subprocessorsReviewed: z.boolean().optional(),
+    sandboxSchemaValidated: z.boolean().optional(),
+    webhookSigningValidated: z.boolean().optional(),
+    exportRights: z.boolean().optional(),
+    normalizedStorageRights: z.boolean().optional(),
+    clientDisplayRights: z.boolean().optional(),
+    deletionRights: z.boolean().optional(),
+    replacementRights: z.boolean().optional(),
+    monthlyCommitmentUnder750: z.boolean().optional(),
+    evidence: policyEvidenceSchema.optional(),
+  })
+  .strict();
 const connectionSchema = z
   .object({
     externalAccountId: z.string().trim().max(255).nullable().optional(),
@@ -18,17 +54,7 @@ const connectionSchema = z
       .default([]),
     status: z.enum(["pending", "approved", "disabled"]).default("pending"),
     credentialRef: z.enum(["env:CUSTOMERS_AI_API_KEY", "env:RB2B_API_KEY", "env:PDL_API_KEY"]).nullable().optional(),
-    attestations: z
-      .object({
-        exportRights: z.literal(true),
-        normalizedStorageRights: z.literal(true),
-        clientDisplayRights: z.literal(true),
-        deletionRights: z.literal(true),
-        replacementRights: z.literal(true),
-        monthlyCommitmentUnder750: z.literal(true),
-      })
-      .strict()
-      .optional(),
+    attestations: policyAttestationsSchema.optional(),
   })
   .strict();
 
@@ -53,7 +79,9 @@ export async function listIdentityProviderConnections(
   reply: FastifyReply
 ) {
   const principal = await getAgencyPrincipal(request, request.params.organizationId);
-  if (!principal) return reply.status(403).send({ error: "Organization access is required" });
+  if (!principal?.canManage) {
+    return reply.status(403).send({ error: "Organization administrator access is required" });
+  }
   const rows = await db
     .select({
       provider: identityProviderConnections.provider,
@@ -69,7 +97,27 @@ export async function listIdentityProviderConnections(
     })
     .from(identityProviderConnections)
     .where(eq(identityProviderConnections.organizationId, request.params.organizationId));
-  return reply.send({ data: rows });
+  const byProvider = new Map(rows.map(row => [row.provider, row]));
+  return reply.send({
+    data: identityProviderConnectionProviders.map(provider => {
+      const row = byProvider.get(provider);
+      const capabilities = (row?.capabilities ?? []) as IdentityProviderCapability[];
+      return {
+        configured: Boolean(row),
+        provider,
+        externalAccountId: row?.externalAccountId ?? null,
+        capabilities,
+        status: row?.status ?? "pending",
+        credentialRef: row?.credentialRef ?? providerCredentialRefs[provider],
+        policyAttestations: (row?.policyAttestations ?? {}) as IdentityProviderPolicyAttestations,
+        policyApprovedBy: row?.policyApprovedBy ?? null,
+        policyApprovedAt: row?.policyApprovedAt ?? null,
+        lastHealthCheckAt: row?.lastHealthCheckAt ?? null,
+        lastHealthStatus: row?.lastHealthStatus ?? null,
+        readiness: getProviderRuntimeReadiness(provider, capabilities),
+      };
+    }),
+  });
 }
 
 export async function upsertIdentityProviderConnection(
@@ -81,16 +129,23 @@ export async function upsertIdentityProviderConnection(
   if (!params.success || !body.success) return reply.status(400).send({ error: "Invalid provider connection" });
   const principal = await getAgencyPrincipal(request, params.data.organizationId);
   if (!principal?.canManage) return reply.status(403).send({ error: "Organization administrator access is required" });
-  if (body.data.status === "approved" && !body.data.attestations) {
-    return reply.status(409).send({ error: "All provider contract and data-rights attestations are required" });
-  }
-  if (
-    body.data.status === "approved" &&
-    (getPilotBudgetCents() === null || getProviderCostMicros(params.data.provider) === null)
-  ) {
+  const provider = params.data.provider as IdentityProviderConnectionProvider;
+  const capabilities = body.data.capabilities as IdentityProviderCapability[];
+  const runtimeReadiness = getProviderRuntimeReadiness(provider, capabilities);
+  const policyBlockers = getProviderPolicyBlockers(provider, body.data.attestations);
+  const expectedCredentialRef = providerCredentialRefs[provider];
+  if (body.data.status === "approved" && policyBlockers.length > 0) {
     return reply.status(409).send({
-      error: "A valid provider price and organization pilot budget are required before approval",
-      code: "PROVIDER_PRICING_NOT_CONFIGURED",
+      error: "Provider contract review is incomplete",
+      code: "PROVIDER_POLICY_INCOMPLETE",
+      blockers: policyBlockers,
+    });
+  }
+  if (body.data.status === "approved" && runtimeReadiness.blockers.length > 0) {
+    return reply.status(409).send({
+      error: "Provider runtime configuration is incomplete",
+      code: "PROVIDER_RUNTIME_NOT_READY",
+      blockers: runtimeReadiness.blockers,
     });
   }
   if (body.data.status === "approved" && params.data.provider !== "pdl" && !body.data.capabilities.includes("delete")) {
@@ -106,27 +161,55 @@ export async function upsertIdentityProviderConnection(
   if (body.data.status === "approved" && params.data.provider === "pdl" && !body.data.capabilities.includes("enrich")) {
     return reply.status(409).send({ error: "PDL enrichment capability is required before approval" });
   }
-  const expectedCredentialRef = {
-    customers_ai: "env:CUSTOMERS_AI_API_KEY",
-    rb2b: "env:RB2B_API_KEY",
-    pdl: "env:PDL_API_KEY",
-  }[params.data.provider];
   if (body.data.credentialRef && body.data.credentialRef !== expectedCredentialRef) {
     return reply.status(400).send({ error: "Credential reference does not match the selected provider" });
   }
+  const [existing] = await db
+    .select({
+      id: identityProviderConnections.id,
+      capabilities: identityProviderConnections.capabilities,
+      externalAccountId: identityProviderConnections.externalAccountId,
+      credentialRef: identityProviderConnections.credentialRef,
+      lastHealthStatus: identityProviderConnections.lastHealthStatus,
+    })
+    .from(identityProviderConnections)
+    .where(
+      and(
+        eq(identityProviderConnections.organizationId, params.data.organizationId),
+        eq(identityProviderConnections.provider, provider)
+      )
+    )
+    .limit(1);
+  if (body.data.status === "approved") {
+    if (
+      !hasHealthySavedProviderConfiguration(existing, {
+        capabilities: body.data.capabilities,
+        externalAccountId: body.data.externalAccountId ?? null,
+        credentialRef: expectedCredentialRef,
+      })
+    ) {
+      return reply.status(409).send({
+        error: "Save the provider configuration and pass a health check before approval",
+        code: "PROVIDER_HEALTH_CHECK_REQUIRED",
+      });
+    }
+  }
   const now = new Date().toISOString();
+  const policyAttestations = body.data.attestations ?? {};
   const [connection] = await db
     .insert(identityProviderConnections)
     .values({
       organizationId: params.data.organizationId,
-      provider: params.data.provider,
+      provider,
       externalAccountId: body.data.externalAccountId,
       capabilities: body.data.capabilities,
       status: body.data.status,
-      credentialRef: body.data.credentialRef,
-      policyAttestations: body.data.status === "approved" ? body.data.attestations : {},
+      credentialRef: expectedCredentialRef,
+      policyAttestations,
       policyApprovedBy: body.data.status === "approved" ? principal.userId : null,
       policyApprovedAt: body.data.status === "approved" ? now : null,
+      lastHealthCheckAt: null,
+      lastHealthStatus: null,
       updatedAt: now,
     })
     .onConflictDoUpdate({
@@ -135,10 +218,11 @@ export async function upsertIdentityProviderConnection(
         externalAccountId: body.data.externalAccountId,
         capabilities: body.data.capabilities,
         status: body.data.status,
-        credentialRef: body.data.credentialRef,
-        policyAttestations: body.data.status === "approved" ? body.data.attestations : {},
+        credentialRef: expectedCredentialRef,
+        policyAttestations,
         policyApprovedBy: body.data.status === "approved" ? principal.userId : null,
         policyApprovedAt: body.data.status === "approved" ? now : null,
+        ...(body.data.status === "approved" ? {} : { lastHealthCheckAt: null, lastHealthStatus: null }),
         updatedAt: now,
       },
     })
@@ -147,7 +231,7 @@ export async function upsertIdentityProviderConnection(
     organizationId: params.data.organizationId,
     actorUserId: principal.userId,
     action: "identity_provider.connection_updated",
-    provider: params.data.provider,
+    provider,
   });
   return reply.send({ success: true, connection });
 }

@@ -57,6 +57,72 @@ export type IdentityProvider = (typeof identityProviders)[number];
 export const enrichmentProviders = ["pdl"] as const;
 export type EnrichmentProviderName = (typeof enrichmentProviders)[number];
 
+export const identityProviderConnectionProviders = [...identityProviders, ...enrichmentProviders] as const;
+export type IdentityProviderConnectionProvider = (typeof identityProviderConnectionProviders)[number];
+
+export const identityProviderCapabilities = ["resolve", "webhook", "delete", "enrich"] as const;
+export type IdentityProviderCapability = (typeof identityProviderCapabilities)[number];
+
+export const identityProviderAttestationKeys = [
+  "dpaReviewed",
+  "subprocessorsReviewed",
+  "sandboxSchemaValidated",
+  "webhookSigningValidated",
+  "exportRights",
+  "normalizedStorageRights",
+  "clientDisplayRights",
+  "deletionRights",
+  "replacementRights",
+  "monthlyCommitmentUnder750",
+] as const;
+export type IdentityProviderAttestationKey = (typeof identityProviderAttestationKeys)[number];
+
+export const identityProviderEvidenceKeys = [
+  "dpaReference",
+  "subprocessorsReference",
+  "schemaReference",
+  "deletionReference",
+  "dataRightsReference",
+  "pricingReference",
+] as const;
+export type IdentityProviderEvidenceKey = (typeof identityProviderEvidenceKeys)[number];
+
+export interface IdentityProviderPolicyAttestations extends Partial<Record<IdentityProviderAttestationKey, boolean>> {
+  evidence?: Partial<Record<IdentityProviderEvidenceKey, string>>;
+}
+
+export interface IdentityProviderRuntimeReadiness {
+  credentialConfigured: boolean;
+  pricingConfigured: boolean;
+  pilotBudgetConfigured: boolean;
+  transportConfigured: boolean;
+  deletionConfigured: boolean;
+  blockers: string[];
+}
+
+export interface IdentityProviderConnection {
+  configured: boolean;
+  provider: IdentityProviderConnectionProvider;
+  externalAccountId: string | null;
+  capabilities: IdentityProviderCapability[];
+  status: "pending" | "approved" | "disabled" | "failed";
+  credentialRef: string | null;
+  policyAttestations: IdentityProviderPolicyAttestations;
+  policyApprovedBy: string | null;
+  policyApprovedAt: string | null;
+  lastHealthCheckAt: string | null;
+  lastHealthStatus: "healthy" | "failed" | null;
+  readiness: IdentityProviderRuntimeReadiness;
+}
+
+export interface UpdateIdentityProviderConnection {
+  externalAccountId?: string | null;
+  capabilities: IdentityProviderCapability[];
+  status: "pending" | "approved" | "disabled";
+  credentialRef?: string | null;
+  attestations?: IdentityProviderPolicyAttestations;
+}
+
 export type IdentityResolutionMode = "consumer" | "business";
 export type IdentityMatchMethod = "deterministic" | "probabilistic";
 export type IdentityCandidateStatus = "pending" | "approved" | "rejected" | "suppressed" | "expired";
